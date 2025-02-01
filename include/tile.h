@@ -16,7 +16,7 @@
         SOUTH,
         WEST,
         CENTER,
-        NOTHING
+        NO_DIRECTION
     }direction_t;
 
     typedef enum{
@@ -25,7 +25,7 @@
         GREEN,
         YELLOW,
         WHITE,
-        NOTHING
+        NO_COLOR
     }color_t;
 
     typedef struct{
