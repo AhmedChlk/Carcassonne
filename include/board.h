@@ -6,7 +6,4 @@
         tile_t** grid;
     }board_t;
 
-    board_t* alloc_board(int height , int width);
-    
-    void free_board(board_t* board);
 #endif

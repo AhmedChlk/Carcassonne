@@ -26,3 +26,6 @@ $(BIN_DIR) :
 
 clean :
 	rm -f $(BUILD_DIR)/*.o $(TARGET)
+
+run : 
+	@./bin/main.exe
