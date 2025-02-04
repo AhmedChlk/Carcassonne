@@ -1,6 +1,7 @@
 #ifndef TILE_H
 #define TILE_H
 #define NB_TILES 72
+#include<stdbool.h>
 
     typedef enum{
         BLASON,
@@ -31,7 +32,7 @@
 
     typedef struct{
         type_zone_t tab_zones[5];
-        int is_meeple;
+        bool is_meeple;
         direction_t pos_meeple;
         color_t col_meeple;
     }tile_t;

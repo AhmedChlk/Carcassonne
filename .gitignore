@@ -1,1 +1,5 @@
-*.o, *.out * test.c
+*.o
+*.out
+test.c
+bin/
+build/
