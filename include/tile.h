@@ -30,6 +30,13 @@
         NO_COLOR
     }color_t;
 
+    typedef enum {
+        ZERO,
+        NINETY,
+        ONE_HUNDRED_EIGHTY,
+        TWO_HUNDRED_SEVENTY
+    }degree_t;
+    
     typedef struct{
         type_zone_t tab_zones[5];
         bool is_meeple;

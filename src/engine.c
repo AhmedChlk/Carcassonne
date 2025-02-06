@@ -160,6 +160,41 @@ void place_tile (board_t* board,tile_t t,int x,int y){
     board->grid[x][y] = t;
 }
 
+void rotate_tile(tile_t* t, degree_t deg) {
+    switch(deg) {
+        case ZERO:
+            break;
+        case NINETY: {
+            type_zone_t temp = t->tab_zones[NORTH];
+            t->tab_zones[NORTH] = t->tab_zones[WEST];
+            t->tab_zones[WEST]  = t->tab_zones[SOUTH];
+            t->tab_zones[SOUTH] = t->tab_zones[EAST];
+            t->tab_zones[EAST]  = temp;
+            break;
+        }
+        case ONE_HUNDRED_EIGHTY: {
+            type_zone_t temp = t->tab_zones[NORTH];
+            t->tab_zones[NORTH] = t->tab_zones[SOUTH];
+            t->tab_zones[SOUTH] = temp;
+            
+            temp = t->tab_zones[EAST];
+            t->tab_zones[EAST]  = t->tab_zones[WEST];
+            t->tab_zones[WEST]  = temp;
+            break;
+        }
+        case TWO_HUNDRED_SEVENTY: {
+            type_zone_t temp = t->tab_zones[NORTH];
+            t->tab_zones[NORTH] = t->tab_zones[EAST];
+            t->tab_zones[EAST]  = t->tab_zones[SOUTH];
+            t->tab_zones[SOUTH] = t->tab_zones[WEST];
+            t->tab_zones[WEST]  = temp;
+            break;
+        }
+        default:
+            break;
+    }
+}
+
 
 
 

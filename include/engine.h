@@ -11,4 +11,5 @@
     game_players_t create_players();
     tile_t pick_tile (tiles_pack_t* tp);
     void place_tile (board_t* board,tile_t t,int x,int y);
+    void rotate_tile(tile_t* t, degree_t deg);
 #endif
