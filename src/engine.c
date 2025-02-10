@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
 #include <time.h>
 #include "board.h"
-#include <string.h>
 #include "tile.h"
+#include "player.h"
+
 board_t* init_board(int height,int width){
     board_t* board = (board_t*) malloc(sizeof(board_t));
     if(board == NULL){
@@ -18,6 +21,9 @@ board_t* init_board(int height,int width){
     }
     for(int i=0;i<height;i++){
         for(int j=0;j<width;j++){
+            for(int k=0;k<5;k++){
+                board->grid[i][j].tab_zones[k]=NO_ZONE;
+            }
             board->grid[i][j].is_meeple=0;
             board->grid[i][j].pos_meeple = NO_DIRECTION;
             board->grid[i][j].col_meeple = NO_COLOR;       
@@ -73,12 +79,204 @@ tiles_pack_t init_tiles_pack(const char* fname){
 
             token = strtok(NULL, ",\n");
         }
+        tp.tab_tiles[index_tiles].is_meeple = false;
+        tp.tab_tiles[index_tiles].pos_meeple = NO_DIRECTION;
+        tp.tab_tiles[index_tiles].col_meeple = NO_COLOR;
         index_tiles++;
     }
     return tp;
 }
 
+void shuffle_tiles_pack(tiles_pack_t* tp){
+        tile_t temp;
+        int tile_1,tile_2;
+    for(int i=0;i<NB_TILES;i++){
+        do{ 
+        tile_1 = rand() % NB_TILES;
+        tile_2 = rand() % NB_TILES;
+        }while(tile_1 == tile_2);
+        temp = tp->tab_tiles[tile_1];
+        tp->tab_tiles[tile_1] = tp->tab_tiles[tile_2];
+        tp->tab_tiles[tile_2] = temp;
+    }   
+}
+
+game_players_t create_players(){
+    game_players_t gp;
+    color_t tab_colors[5] = {RED,BLEUE,GREEN,YELLOW,WHITE};
+    int nb_players;
+    printf(" a combien de joueurs allez vous jouer (min 1 max 5) : ");
+    while(scanf("%d",&nb_players) != 1  || nb_players < 1 || nb_players > 5){
+        printf("erreur entrez une valeur valide\n");
+        printf(" a combien de joueurs allez vous jouer (min 1 max 5) : ");
+        while(getchar() != '\n');
+    }
+    while(getchar() != '\n');
+    gp.nb_players = nb_players;
+    gp.tab_players = (player_t*) malloc (nb_players * sizeof(player_t));
+    for(int i = 0;i<nb_players;i++){
+        printf("entrez le nom du joueur %d (max 50 car) : ",i+1);
+        fgets(gp.tab_players[i].name,sizeof(gp.tab_players[i].name),stdin);
+        gp.tab_players[i].col_meeple = tab_colors[i];
+        gp.tab_players[i].meeples = NB_MEEPLES;
+        gp.tab_players[i].is_ia = false;
+    }
+    if(nb_players < 5){
+        char answer;
+        int nb_ia;
+        if(nb_players > 1){
+        printf("voulez vous inclure une(des) IA dans la partie ? (y/n)");
+        scanf("%c",&answer);
+        }
+        if(answer == 'y' || answer == 'Y' || nb_players == 1){
+            printf("entrez le nombre d\'ia que vous voulez (max %d)",5-nb_players);
+            while(scanf("%d",&nb_ia) != 1 || nb_ia < 0 || nb_ia + nb_players > 5 || nb_ia + nb_players < 2){
+                printf("entrez un nombre d\'ia valides\n");
+                printf("entrez le nombre d\'ia que vous voulez (max %d)",5-nb_players);
+                while(getchar() != '\n');
+            }
+            for(int i = nb_players; i < nb_players + nb_ia; i++) {
+                int ia_num = i - nb_players + 1;
+                char ia_name[16]; 
+                snprintf(ia_name, sizeof(ia_name), "IA_%d", ia_num);
+
+                gp.tab_players[i].col_meeple = tab_colors[i];
+                gp.tab_players[i].meeples    = NB_MEEPLES;
+                gp.tab_players[i].is_ia      = true;
+                strcpy(gp.tab_players[i].name, ia_name);
+                gp.nb_players++;
+            }
+        }
+    
+
+    }
+    return gp;
+}
+
+
+tile_t pick_tile (tiles_pack_t* tp){
+    tile_t t = tp->tab_tiles[tp->remaining_tiles - 1];
+    tp->remaining_tiles--;
+    return t;
+}
 
 
 
+void rotate_tile(tile_t* t, degree_t deg) {
+    switch(deg) {
+        case ZERO:
+            break;
+        case NINETY: {
+            type_zone_t temp = t->tab_zones[NORTH];
+            t->tab_zones[NORTH] = t->tab_zones[WEST];
+            t->tab_zones[WEST]  = t->tab_zones[SOUTH];
+            t->tab_zones[SOUTH] = t->tab_zones[EAST];
+            t->tab_zones[EAST]  = temp;
+            break;
+        }
+        case ONE_HUNDRED_EIGHTY: {
+            type_zone_t temp = t->tab_zones[NORTH];
+            t->tab_zones[NORTH] = t->tab_zones[SOUTH];
+            t->tab_zones[SOUTH] = temp;
+            
+            temp = t->tab_zones[EAST];
+            t->tab_zones[EAST]  = t->tab_zones[WEST];
+            t->tab_zones[WEST]  = temp;
+            break;
+        }
+        case TWO_HUNDRED_SEVENTY: {
+            type_zone_t temp = t->tab_zones[NORTH];
+            t->tab_zones[NORTH] = t->tab_zones[EAST];
+            t->tab_zones[EAST]  = t->tab_zones[SOUTH];
+            t->tab_zones[SOUTH] = t->tab_zones[WEST];
+            t->tab_zones[WEST]  = temp;
+            break;
+        }
+        default:
+            break;
+    }
+}
 
+
+bool check_empty_case(board_t* b,position_t p){
+    for(int i=0;i<5;i++){
+        if(b->grid[p.x][p.y].tab_zones[i] != NO_ZONE){
+                return false;
+        }
+    }
+    return true;
+}
+
+bool is_in_frontiere(frontieres_t* f,position_t p){
+    for(int i=0;i<f->actual ; i++){
+        if(f->tab_frontieres[i].x == p.x && f->tab_frontieres[i].y == p.y){
+            return true;
+        }
+    }
+    return false;
+}
+
+frontieres_t* alloc_frontieres(){
+    frontieres_t* f = (frontieres_t*) malloc(sizeof(frontieres_t));
+    f->actual = 0;
+    f->capacity = NB_TILES;
+    f->tab_frontieres = (position_t*) malloc (f->capacity * sizeof(position_t));
+    for(int i=0;i<f->capacity;i++){
+        f->tab_frontieres[i].x = -1;
+        f->tab_frontieres[i].y = -1;
+
+    }
+    return f;
+}
+
+void free_frontieres(frontieres_t** f){
+    free((*f)->tab_frontieres);
+    free(*f);
+    (*f) = NULL;
+}
+
+
+
+void add_to_frontiere(frontieres_t* f,position_t p){
+    if(!is_in_frontiere(f,p)){
+        if(f->actual == f->capacity -1){
+            f->capacity *= 2;
+            f->tab_frontieres = realloc(f->tab_frontieres,f->capacity*sizeof(position_t));
+        }
+        f->tab_frontieres[f->actual++] = p;
+    }
+}
+
+void remove_from_frontiere(frontieres_t* f,position_t p){
+    int i=0;
+    while(i<f->actual && (f->tab_frontieres[i].x != p.x || f->tab_frontieres[i].y != p.y)){
+        i++;
+    }
+    if(i >= f->actual){
+        fprintf(stderr,"erreur position que vous cherchez a supprimer des frontieres inexistantes");
+        exit(EXIT_FAILURE);
+    }
+    for(int j = i ; j < f->actual;j++){
+        f->tab_frontieres[j] = f->tab_frontieres[j+1];
+    }
+    f->actual--;
+}
+void add_frontieres_after_placement(board_t* b,frontieres_t* f,position_t p){
+    position_t delta [4] = {{-1,0},{0,1},{1,0},{0,-1}};
+    for(int k=0;k<4;k++){
+        int nx = p.x + delta[k].x;
+        int ny = p.y + delta[k].y;
+        if (nx >= 0 && nx < b->height && ny >= 0 && ny < b->width) {
+            if (check_empty_case(b, (position_t){nx, ny}))
+                add_to_frontiere(f, (position_t){nx, ny});
+        }
+    }
+}
+
+void place_tile (board_t* board,frontieres_t* f,tile_t t,position_t p){
+    board->grid[p.x][p.y] = t;
+    add_frontieres_after_placement(board,f,p);
+    if(is_in_frontiere(f,p)){
+        remove_from_frontiere(f,p);
+    }
+}
