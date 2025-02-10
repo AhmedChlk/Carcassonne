@@ -3,13 +3,28 @@
 #define NB_TILES 72
 #include<stdbool.h>
 
+    typedef struct{
+        int x,y;
+    }position_t;
+    
+    typedef struct{
+        position_t* tab_valide_pos;
+        int taille,actual;
+    }valide_position_t;
+
+    typedef struct{
+        position_t* tab_frontieres;
+        int actual,capacity;
+    }frontieres_t;
+
     typedef enum{
         BLASON,
         ROAD,
         PRE,
         CITY,
         VILLAGE,
-        ABBEY
+        ABBEY,
+        NO_ZONE
     }type_zone_t;
 
     typedef enum{
@@ -36,7 +51,7 @@
         ONE_HUNDRED_EIGHTY,
         TWO_HUNDRED_SEVENTY
     }degree_t;
-    
+
     typedef struct{
         type_zone_t tab_zones[5];
         bool is_meeple;

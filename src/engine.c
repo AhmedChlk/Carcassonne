@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <time.h>
 #include "board.h"
 #include "tile.h"
@@ -20,6 +21,9 @@ board_t* init_board(int height,int width){
     }
     for(int i=0;i<height;i++){
         for(int j=0;j<width;j++){
+            for(int k=0;k<5;k++){
+                board->grid[i][j].tab_zones[k]=NO_ZONE;
+            }
             board->grid[i][j].is_meeple=0;
             board->grid[i][j].pos_meeple = NO_DIRECTION;
             board->grid[i][j].col_meeple = NO_COLOR;       
@@ -156,9 +160,7 @@ tile_t pick_tile (tiles_pack_t* tp){
     return t;
 }
 
-void place_tile (board_t* board,tile_t t,int x,int y){
-    board->grid[x][y] = t;
-}
+
 
 void rotate_tile(tile_t* t, degree_t deg) {
     switch(deg) {
@@ -196,6 +198,85 @@ void rotate_tile(tile_t* t, degree_t deg) {
 }
 
 
+bool check_empty_case(board_t* b,position_t p){
+    for(int i=0;i<5;i++){
+        if(b->grid[p.x][p.y].tab_zones[i] != NO_ZONE){
+                return false;
+        }
+    }
+    return true;
+}
+
+bool is_in_frontiere(frontieres_t* f,position_t p){
+    for(int i=0;i<f->actual ; i++){
+        if(f->tab_frontieres[i].x == p.x && f->tab_frontieres[i].y == p.y){
+            return true;
+        }
+    }
+    return false;
+}
+
+frontieres_t* alloc_frontieres(){
+    frontieres_t* f = (frontieres_t*) malloc(sizeof(frontieres_t));
+    f->actual = 0;
+    f->capacity = NB_TILES;
+    f->tab_frontieres = (position_t*) malloc (f->capacity * sizeof(position_t));
+    for(int i=0;i<f->capacity;i++){
+        f->tab_frontieres[i].x = -1;
+        f->tab_frontieres[i].y = -1;
+
+    }
+    return f;
+}
+
+void free_frontieres(frontieres_t** f){
+    free((*f)->tab_frontieres);
+    free(*f);
+    (*f) = NULL;
+}
 
 
 
+void add_to_frontiere(frontieres_t* f,position_t p){
+    if(!is_in_frontiere(f,p)){
+        if(f->actual == f->capacity -1){
+            f->capacity *= 2;
+            f->tab_frontieres = realloc(f->tab_frontieres,f->capacity*sizeof(position_t));
+        }
+        f->tab_frontieres[f->actual++] = p;
+    }
+}
+
+void remove_from_frontiere(frontieres_t* f,position_t p){
+    int i=0;
+    while(i<f->actual && (f->tab_frontieres[i].x != p.x || f->tab_frontieres[i].y != p.y)){
+        i++;
+    }
+    if(i >= f->actual){
+        fprintf(stderr,"erreur position que vous cherchez a supprimer des frontieres inexistantes");
+        exit(EXIT_FAILURE);
+    }
+    for(int j = i ; j < f->actual;j++){
+        f->tab_frontieres[j] = f->tab_frontieres[j+1];
+    }
+    f->actual--;
+}
+void add_frontieres_after_placement(board_t* b,frontieres_t* f,position_t p){
+    position_t delta [4] = {{-1,0},{0,1},{1,0},{0,-1}};
+    for(int k=0;k<4;k++){
+        int nx = p.x + delta[k].x;
+        int ny = p.y + delta[k].y;
+        if (nx >= 0 && nx < b->height && ny >= 0 && ny < b->width) {
+            if (check_empty_case(b, (position_t){nx, ny}))
+                add_to_frontiere(f, (position_t){nx, ny});
+        }
+    }
+}
+
+void place_tile (board_t* board,frontieres_t* f,tile_t t,position_t p){
+    board->grid[p.x][p.y] = t;
+    add_frontieres_after_placement(board,f,p);
+    if(is_in_frontiere(f,p)){
+        remove_from_frontiere(f,p);
+    }
+}
