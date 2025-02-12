@@ -21,4 +21,15 @@ void remove_from_frontier(frontiers_t* frontier, position_t pos);
 void update_frontier_after_placement(board_t* board, frontiers_t* frontier, position_t pos);
 void place_tile(board_t* board, frontiers_t* frontier, tile_t tile, position_t pos);
 
+
+
+
+
+valid_positions_t* allocate_valid_positions();
+void free_valid_positions (valid_positions_t** v);
+void reset_valid_positions(valid_positions_t* v);
+void add_to_valid_positions (valid_positions_t* v,position_t pos);
+bool check_matching_zones(board_t* board,tile_t tile,position_t pos);
+void get_placement_tile (board_t* b,frontiers_t* frontier,tile_t tile,valid_positions_t* valid_positions);
+
 #endif

@@ -10,7 +10,7 @@ typedef struct {
 
 typedef struct {
     position_t* valid_positions;
-    int size, count;
+    int actual, capacity;
 } valid_positions_t;
 
 typedef struct {

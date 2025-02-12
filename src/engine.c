@@ -267,3 +267,64 @@ void place_tile(board_t* board, frontiers_t* frontier, tile_t tile, position_t p
         remove_from_frontier(frontier, pos);
     }
 }
+
+valid_positions_t* allocate_valid_positions(){
+    valid_positions_t* v = (valid_positions_t*) malloc (sizeof(valid_positions_t));
+    v->actual = 0;
+    v->capacity = NB_TILES;
+    v->valid_positions = (position_t*) malloc(v->capacity * sizeof(position_t));
+    for (int i = 0; i < v->capacity; i++) {
+        v->valid_positions[i].x = -1;
+        v->valid_positions[i].y = -1;
+    }
+    return v;
+}
+void free_valid_positions (valid_positions_t** v){
+    free((*v)->valid_positions);
+    free(*v);
+    *v = NULL;
+}
+
+void reset_valid_positions(valid_positions_t* v){
+    for(int i=0;i<v->capacity;i++){
+        v->valid_positions[i].x = -1;
+        v->valid_positions[i].y = -1;
+    }
+    v->actual = 0;
+}
+
+void add_to_valid_positions (valid_positions_t* v,position_t pos){
+    if (v->actual == v->capacity - 1) {
+            v->capacity *= 2;
+            v->valid_positions = realloc(v->valid_positions, v->capacity * sizeof(position_t));
+        }
+        v->valid_positions[v->actual++] = pos;
+        //printf("ajout de (%d,%d) dans le tableau de positions\n",pos.x,pos.y);
+}
+
+bool check_matching_zones(board_t* board,tile_t tile,position_t pos){
+    position_t delta[4] = { {-1, 0}, {0, 1}, {1, 0}, {0, -1} };
+    direction_t d[4] = {SOUTH,WEST,NORTH,EAST};
+    for (int k = 0; k < 4; k++) {
+        int nx = pos.x + delta[k].x;
+        int ny = pos.y + delta[k].y;
+        if (nx >= 0 && nx < board->height && ny >= 0 && ny < board->width) {
+            if(board->grid[nx][ny].zones[d[k]] != NONE){
+                if (tile.zones[k] != board->grid[nx][ny].zones[d[k]])
+                    return false;
+            }
+        }
+    }
+    return true;
+}
+void get_placement_tile (board_t* b,frontiers_t* frontier,tile_t tile,valid_positions_t* valid_positions){
+    reset_valid_positions(valid_positions);
+    for(int i=0;i<frontier->actual;i++){
+        position_t p = {frontier->positions[i].x,frontier->positions[i].y};
+        //printf("test de (%d,%d)\n",p.x,p.y);
+        if(check_matching_zones(b,tile,p)){
+            //printf("placement possible\n");
+            add_to_valid_positions(valid_positions,p);
+        }
+    }
+}
