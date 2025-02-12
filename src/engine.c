@@ -267,3 +267,18 @@ void place_tile(board_t* board, frontiers_t* frontier, tile_t tile, position_t p
         remove_from_frontier(frontier, pos);
     }
 }
+
+// Meeple functions 
+
+void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t pos, color_t c)
+{
+    /*Place the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)*/
+
+    board->grid[pos.x][pos.y].meeple_position = d;
+    board->grid[pos.x][pos.y].meeple_color = c;
+    board->grid[pos.x][pos.y].has_meeple = true;
+
+    for (int i = 0; i < p->num_players; i++)
+        if (p->players[i].meeple_color == c) p->players[i].meeples--;
+    
+}
