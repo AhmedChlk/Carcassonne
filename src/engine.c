@@ -7,189 +7,179 @@
 #include "tile.h"
 #include "player.h"
 
-board_t* init_board(int height,int width){
+board_t* initialize_board(int height, int width) {
     board_t* board = (board_t*) malloc(sizeof(board_t));
-    if(board == NULL){
-        fprintf(stderr,"erreur d'allocation memoire de : board");
+    if (board == NULL) {
+        fprintf(stderr, "Error allocating memory for board\n");
         exit(EXIT_FAILURE);
     }
     board->height = height;
     board->width = width;
-    board->grid = (tile_t**) malloc (height * sizeof (tile_t*));
-    for(int i=0;i<height;i++){
-        board->grid[i]=(tile_t*)malloc(width * sizeof(tile_t));
+    board->grid = (tile_t**) malloc(height * sizeof(tile_t*));
+    for (int i = 0; i < height; i++) {
+        board->grid[i] = (tile_t*) malloc(width * sizeof(tile_t));
     }
-    for(int i=0;i<height;i++){
-        for(int j=0;j<width;j++){
-            for(int k=0;k<5;k++){
-                board->grid[i][j].tab_zones[k]=NO_ZONE;
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            for (int k = 0; k < 5; k++) {
+                board->grid[i][j].zones[k] = NONE;
             }
-            board->grid[i][j].is_meeple=0;
-            board->grid[i][j].pos_meeple = NO_DIRECTION;
-            board->grid[i][j].col_meeple = NO_COLOR;       
-            }
+            board->grid[i][j].has_meeple = false;
+            board->grid[i][j].meeple_position = NO_DIRECTION;
+            board->grid[i][j].meeple_color = NO_COLOR;
+        }
     }
     return board;
 }
-void free_board(board_t* board){
-    for(int i=0;i<board->height;i++){
+
+void free_board(board_t* board) {
+    for (int i = 0; i < board->height; i++) {
         free(board->grid[i]);
     }
     free(board->grid);
     free(board);
 }
 
-tiles_pack_t init_tiles_pack(const char* fname){
+tiles_pack_t initialize_tile_pack(const char* filename) {
     char path[256] = "data/";
-    char* token;
-    strcat(path,fname);
-    FILE* F = fopen(path,"r");
-    if(F == NULL){
-        fprintf(stderr,"error opening file");
+    strcat(path, filename);
+    FILE* file = fopen(path, "r");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening file\n");
         exit(EXIT_FAILURE);
     }
     int buffer_size = 1024;
-    char buffer[buffer_size];
-    int index_zones,index_tiles = 0;
-    tiles_pack_t tp;
-    tp.remaining_tiles = NB_TILES;
-    while(fgets(buffer,buffer_size,F) != NULL){
-        index_zones = 0;
-        token = strtok(buffer,",\n");
-        while(token != NULL){
-                if (!strcmp(token,"blason"))
-                    tp.tab_tiles[index_tiles].tab_zones[index_zones++] = BLASON;
-
-                else if (!strcmp(token,"route"))
-                    tp.tab_tiles[index_tiles].tab_zones[index_zones++] = ROAD;
-                    
-            
-                else if (!strcmp(token,"pre"))
-                    tp.tab_tiles[index_tiles].tab_zones[index_zones++] = PRE;
-                    
-
-                else if (!strcmp(token,"village"))
-                    tp.tab_tiles[index_tiles].tab_zones[index_zones++] = VILLAGE;
-                    
-
-                else if (!strcmp(token,"ville"))
-                    tp.tab_tiles[index_tiles].tab_zones[index_zones++] = CITY;
-                else if (!strcmp(token,"abbaye"))
-                    tp.tab_tiles[index_tiles].tab_zones[index_zones++] = ABBEY;
-
+    char buffer[1024];
+    int zone_index, tile_index = 0;
+    tiles_pack_t tile_pack;
+    tile_pack.remaining_tiles = NB_TILES;
+    while (fgets(buffer, buffer_size, file) != NULL) {
+        zone_index = 0;
+        char* token = strtok(buffer, ",\n");
+        while (token != NULL) {
+            if (strcmp(token, "blason") == 0)
+                tile_pack.tiles[tile_index].zones[zone_index++] = SHIELD;
+            else if (strcmp(token, "route") == 0)
+                tile_pack.tiles[tile_index].zones[zone_index++] = ROAD;
+            else if (strcmp(token, "pre") == 0)
+                tile_pack.tiles[tile_index].zones[zone_index++] = FIELD;
+            else if (strcmp(token, "village") == 0)
+                tile_pack.tiles[tile_index].zones[zone_index++] = VILLAGE;
+            else if (strcmp(token, "ville") == 0)
+                tile_pack.tiles[tile_index].zones[zone_index++] = CITY;
+            else if (strcmp(token, "abbaye") == 0)
+                tile_pack.tiles[tile_index].zones[zone_index++] = ABBEY;
             token = strtok(NULL, ",\n");
         }
-        tp.tab_tiles[index_tiles].is_meeple = false;
-        tp.tab_tiles[index_tiles].pos_meeple = NO_DIRECTION;
-        tp.tab_tiles[index_tiles].col_meeple = NO_COLOR;
-        index_tiles++;
+        tile_pack.tiles[tile_index].has_meeple = false;
+        tile_pack.tiles[tile_index].meeple_position = NO_DIRECTION;
+        tile_pack.tiles[tile_index].meeple_color = NO_COLOR;
+        tile_index++;
     }
-    return tp;
+    fclose(file);
+    return tile_pack;
 }
 
-void shuffle_tiles_pack(tiles_pack_t* tp){
-        tile_t temp;
-        int tile_1,tile_2;
-    for(int i=0;i<NB_TILES;i++){
-        do{ 
-        tile_1 = rand() % NB_TILES;
-        tile_2 = rand() % NB_TILES;
-        }while(tile_1 == tile_2);
-        temp = tp->tab_tiles[tile_1];
-        tp->tab_tiles[tile_1] = tp->tab_tiles[tile_2];
-        tp->tab_tiles[tile_2] = temp;
-    }   
+void shuffle_tile_pack(tiles_pack_t* tile_pack) {
+    tile_t temp;
+    int index1, index2;
+    for (int i = 0; i < NB_TILES; i++) {
+        do {
+            index1 = rand() % NB_TILES;
+            index2 = rand() % NB_TILES;
+        } while (index1 == index2);
+        temp = tile_pack->tiles[index1];
+        tile_pack->tiles[index1] = tile_pack->tiles[index2];
+        tile_pack->tiles[index2] = temp;
+    }
 }
 
-game_players_t create_players(){
-    game_players_t gp;
-    color_t tab_colors[5] = {RED,BLEUE,GREEN,YELLOW,WHITE};
-    int nb_players;
-    printf(" a combien de joueurs allez vous jouer (min 1 max 5) : ");
-    while(scanf("%d",&nb_players) != 1  || nb_players < 1 || nb_players > 5){
-        printf("erreur entrez une valeur valide\n");
-        printf(" a combien de joueurs allez vous jouer (min 1 max 5) : ");
-        while(getchar() != '\n');
+game_players_t create_players() {
+    game_players_t game_players;
+    color_t available_colors[5] = {RED, BLUE, GREEN, YELLOW, WHITE};
+    int num_players;
+    printf("How many players will participate (min 1, max 5): ");
+    while (scanf("%d", &num_players) != 1 || num_players < 1 || num_players > 5) {
+        printf("Error: Please enter a valid value\n");
+        printf("How many players will participate (min 1, max 5): ");
+        while (getchar() != '\n');
     }
-    while(getchar() != '\n');
-    gp.nb_players = nb_players;
-    gp.tab_players = (player_t*) malloc (nb_players * sizeof(player_t));
-    for(int i = 0;i<nb_players;i++){
-        printf("entrez le nom du joueur %d (max 50 car) : ",i+1);
-        fgets(gp.tab_players[i].name,sizeof(gp.tab_players[i].name),stdin);
-        gp.tab_players[i].col_meeple = tab_colors[i];
-        gp.tab_players[i].meeples = NB_MEEPLES;
-        gp.tab_players[i].is_ia = false;
+    while (getchar() != '\n');
+    game_players.num_players = num_players;
+    game_players.players = (player_t*) malloc(num_players * sizeof(player_t));
+    for (int i = 0; i < num_players; i++) {
+        printf("Enter the name of player %d (max 50 characters): ", i + 1);
+        fgets(game_players.players[i].name, sizeof(game_players.players[i].name), stdin);
+        game_players.players[i].name[strcspn(game_players.players[i].name, "\n")] = '\0';
+        game_players.players[i].meeple_color = available_colors[i];
+        game_players.players[i].meeples = NB_MEEPLES;
+        game_players.players[i].is_ai = false;
     }
-    if(nb_players < 5){
+    if (num_players < 5) {
         char answer;
-        int nb_ia;
-        if(nb_players > 1){
-        printf("voulez vous inclure une(des) IA dans la partie ? (y/n)");
-        scanf("%c",&answer);
+        int num_ai;
+        if (num_players > 1) {
+            printf("Do you want to include AI players in the game? (y/n): ");
+            scanf(" %c", &answer);
+            while (getchar() != '\n');
         }
-        if(answer == 'y' || answer == 'Y' || nb_players == 1){
-            printf("entrez le nombre d\'ia que vous voulez (max %d)",5-nb_players);
-            while(scanf("%d",&nb_ia) != 1 || nb_ia < 0 || nb_ia + nb_players > 5 || nb_ia + nb_players < 2){
-                printf("entrez un nombre d\'ia valides\n");
-                printf("entrez le nombre d\'ia que vous voulez (max %d)",5-nb_players);
-                while(getchar() != '\n');
+        if (num_players == 1 || answer == 'y' || answer == 'Y') {
+            printf("Enter the number of AI players you want (max %d): ", 5 - num_players);
+            while (scanf("%d", &num_ai) != 1 || num_ai < 0 || num_ai + num_players > 5 || num_ai + num_players < 2) {
+                printf("Please enter a valid number of AI players\n");
+                printf("Enter the number of AI players you want (max %d): ", 5 - num_players);
+                while (getchar() != '\n');
             }
-            for(int i = nb_players; i < nb_players + nb_ia; i++) {
-                int ia_num = i - nb_players + 1;
-                char ia_name[16]; 
-                snprintf(ia_name, sizeof(ia_name), "IA_%d", ia_num);
-
-                gp.tab_players[i].col_meeple = tab_colors[i];
-                gp.tab_players[i].meeples    = NB_MEEPLES;
-                gp.tab_players[i].is_ia      = true;
-                strcpy(gp.tab_players[i].name, ia_name);
-                gp.nb_players++;
+            game_players.players = (player_t*) realloc(game_players.players, (num_players + num_ai) * sizeof(player_t));
+            for (int i = num_players; i < num_players + num_ai; i++) {
+                int ai_num = i - num_players + 1;
+                char ai_name[16];
+                snprintf(ai_name, sizeof(ai_name), "AI_%d", ai_num);
+                game_players.players[i].meeple_color = available_colors[i];
+                game_players.players[i].meeples = NB_MEEPLES;
+                game_players.players[i].is_ai = true;
+                strcpy(game_players.players[i].name, ai_name);
+                game_players.num_players++;
             }
         }
-    
-
     }
-    return gp;
+    return game_players;
 }
 
-
-tile_t pick_tile (tiles_pack_t* tp){
-    tile_t t = tp->tab_tiles[tp->remaining_tiles - 1];
-    tp->remaining_tiles--;
+tile_t pick_tile(tiles_pack_t* tile_pack) {
+    tile_t t = tile_pack->tiles[tile_pack->remaining_tiles - 1];
+    tile_pack->remaining_tiles--;
     return t;
 }
 
-
-
 void rotate_tile(tile_t* t, degree_t deg) {
-    switch(deg) {
+    switch (deg) {
         case ZERO:
             break;
         case NINETY: {
-            type_zone_t temp = t->tab_zones[NORTH];
-            t->tab_zones[NORTH] = t->tab_zones[WEST];
-            t->tab_zones[WEST]  = t->tab_zones[SOUTH];
-            t->tab_zones[SOUTH] = t->tab_zones[EAST];
-            t->tab_zones[EAST]  = temp;
+            zone_type_t temp = t->zones[NORTH];
+            t->zones[NORTH] = t->zones[WEST];
+            t->zones[WEST]  = t->zones[SOUTH];
+            t->zones[SOUTH] = t->zones[EAST];
+            t->zones[EAST]  = temp;
             break;
         }
         case ONE_HUNDRED_EIGHTY: {
-            type_zone_t temp = t->tab_zones[NORTH];
-            t->tab_zones[NORTH] = t->tab_zones[SOUTH];
-            t->tab_zones[SOUTH] = temp;
+            zone_type_t temp = t->zones[NORTH];
+            t->zones[NORTH] = t->zones[SOUTH];
+            t->zones[SOUTH] = temp;
             
-            temp = t->tab_zones[EAST];
-            t->tab_zones[EAST]  = t->tab_zones[WEST];
-            t->tab_zones[WEST]  = temp;
+            temp = t->zones[EAST];
+            t->zones[EAST]  = t->zones[WEST];
+            t->zones[WEST]  = temp;
             break;
         }
         case TWO_HUNDRED_SEVENTY: {
-            type_zone_t temp = t->tab_zones[NORTH];
-            t->tab_zones[NORTH] = t->tab_zones[EAST];
-            t->tab_zones[EAST]  = t->tab_zones[SOUTH];
-            t->tab_zones[SOUTH] = t->tab_zones[WEST];
-            t->tab_zones[WEST]  = temp;
+            zone_type_t temp = t->zones[NORTH];
+            t->zones[NORTH] = t->zones[EAST];
+            t->zones[EAST]  = t->zones[SOUTH];
+            t->zones[SOUTH] = t->zones[WEST];
+            t->zones[WEST]  = temp;
             break;
         }
         default:
@@ -197,86 +187,83 @@ void rotate_tile(tile_t* t, degree_t deg) {
     }
 }
 
-
-bool check_empty_case(board_t* b,position_t p){
-    for(int i=0;i<5;i++){
-        if(b->grid[p.x][p.y].tab_zones[i] != NO_ZONE){
-                return false;
+bool is_cell_empty(board_t* board, position_t pos) {
+    for (int i = 0; i < 5; i++) {
+        if (board->grid[pos.x][pos.y].zones[i] != NONE) {
+            return false;
         }
     }
     return true;
 }
 
-bool is_in_frontiere(frontieres_t* f,position_t p){
-    for(int i=0;i<f->actual ; i++){
-        if(f->tab_frontieres[i].x == p.x && f->tab_frontieres[i].y == p.y){
+bool is_in_frontier(frontiers_t* frontier, position_t pos) {
+    for (int i = 0; i < frontier->actual; i++) {
+        if (frontier->positions[i].x == pos.x && frontier->positions[i].y == pos.y) {
             return true;
         }
     }
     return false;
 }
 
-frontieres_t* alloc_frontieres(){
-    frontieres_t* f = (frontieres_t*) malloc(sizeof(frontieres_t));
-    f->actual = 0;
-    f->capacity = NB_TILES;
-    f->tab_frontieres = (position_t*) malloc (f->capacity * sizeof(position_t));
-    for(int i=0;i<f->capacity;i++){
-        f->tab_frontieres[i].x = -1;
-        f->tab_frontieres[i].y = -1;
-
+frontiers_t* allocate_frontier() {
+    frontiers_t* frontier = (frontiers_t*) malloc(sizeof(frontiers_t));
+    frontier->actual = 0;
+    frontier->capacity = NB_TILES;
+    frontier->positions = (position_t*) malloc(frontier->capacity * sizeof(position_t));
+    for (int i = 0; i < frontier->capacity; i++) {
+        frontier->positions[i].x = -1;
+        frontier->positions[i].y = -1;
     }
-    return f;
+    return frontier;
 }
 
-void free_frontieres(frontieres_t** f){
-    free((*f)->tab_frontieres);
-    free(*f);
-    (*f) = NULL;
+void free_frontier(frontiers_t** frontier) {
+    free((*frontier)->positions);
+    free(*frontier);
+    *frontier = NULL;
 }
 
-
-
-void add_to_frontiere(frontieres_t* f,position_t p){
-    if(!is_in_frontiere(f,p)){
-        if(f->actual == f->capacity -1){
-            f->capacity *= 2;
-            f->tab_frontieres = realloc(f->tab_frontieres,f->capacity*sizeof(position_t));
+void add_to_frontier(frontiers_t* frontier, position_t pos) {
+    if (!is_in_frontier(frontier, pos)) {
+        if (frontier->actual == frontier->capacity - 1) {
+            frontier->capacity *= 2;
+            frontier->positions = realloc(frontier->positions, frontier->capacity * sizeof(position_t));
         }
-        f->tab_frontieres[f->actual++] = p;
+        frontier->positions[frontier->actual++] = pos;
     }
 }
 
-void remove_from_frontiere(frontieres_t* f,position_t p){
-    int i=0;
-    while(i<f->actual && (f->tab_frontieres[i].x != p.x || f->tab_frontieres[i].y != p.y)){
+void remove_from_frontier(frontiers_t* frontier, position_t pos) {
+    int i = 0;
+    while (i < frontier->actual && (frontier->positions[i].x != pos.x || frontier->positions[i].y != pos.y)) {
         i++;
     }
-    if(i >= f->actual){
-        fprintf(stderr,"erreur position que vous cherchez a supprimer des frontieres inexistantes");
+    if (i >= frontier->actual) {
+        fprintf(stderr, "Error: Position not found in frontier when trying to remove\n");
         exit(EXIT_FAILURE);
     }
-    for(int j = i ; j < f->actual;j++){
-        f->tab_frontieres[j] = f->tab_frontieres[j+1];
+    for (int j = i; j < frontier->actual - 1; j++) {
+        frontier->positions[j] = frontier->positions[j + 1];
     }
-    f->actual--;
+    frontier->actual--;
 }
-void add_frontieres_after_placement(board_t* b,frontieres_t* f,position_t p){
-    position_t delta [4] = {{-1,0},{0,1},{1,0},{0,-1}};
-    for(int k=0;k<4;k++){
-        int nx = p.x + delta[k].x;
-        int ny = p.y + delta[k].y;
-        if (nx >= 0 && nx < b->height && ny >= 0 && ny < b->width) {
-            if (check_empty_case(b, (position_t){nx, ny}))
-                add_to_frontiere(f, (position_t){nx, ny});
+
+void update_frontier_after_placement(board_t* board, frontiers_t* frontier, position_t pos) {
+    position_t delta[4] = { {-1, 0}, {0, 1}, {1, 0}, {0, -1} };
+    for (int k = 0; k < 4; k++) {
+        int nx = pos.x + delta[k].x;
+        int ny = pos.y + delta[k].y;
+        if (nx >= 0 && nx < board->height && ny >= 0 && ny < board->width) {
+            if (is_cell_empty(board, (position_t){nx, ny}))
+                add_to_frontier(frontier, (position_t){nx, ny});
         }
     }
 }
 
-void place_tile (board_t* board,frontieres_t* f,tile_t t,position_t p){
-    board->grid[p.x][p.y] = t;
-    add_frontieres_after_placement(board,f,p);
-    if(is_in_frontiere(f,p)){
-        remove_from_frontiere(f,p);
+void place_tile(board_t* board, frontiers_t* frontier, tile_t tile, position_t pos) {
+    board->grid[pos.x][pos.y] = tile;
+    update_frontier_after_placement(board, frontier, pos);
+    if (is_in_frontier(frontier, pos)) {
+        remove_from_frontier(frontier, pos);
     }
 }
