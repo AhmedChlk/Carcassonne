@@ -283,7 +283,7 @@ void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t p
     
 }
 
-void Remove_meeple(board_t* board, game_players_t* p, direction_t d, position_t pos, color_t c)
+void remove_meeple(board_t* board, game_players_t* p, direction_t d, position_t pos, color_t c)
 {
     /*Remove the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)*/
 
