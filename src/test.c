@@ -83,6 +83,7 @@ int main() {
     place_tile(b,f,t,(position_t){1,2});
     t = pick_tile(&tp);
     place_tile(b,f,t,(position_t){2,2});
+    t = pick_tile(&tp);
     print_board(b);
     printf("tile a jouer : \n");
     print_tile(t);

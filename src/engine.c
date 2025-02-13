@@ -317,14 +317,26 @@ bool check_matching_zones(board_t* board,tile_t tile,position_t pos){
     }
     return true;
 }
+bool is_in_valid_positions(valid_positions_t* v,position_t p){
+    for(int i=0;i<v->actual;i++){
+        if(v->valid_positions[i].x == p.x && v->valid_positions[i].y == p.y ){
+            return true;
+        }
+    }
+    return false;
+}
 void get_placement_tile (board_t* b,frontiers_t* frontier,tile_t tile,valid_positions_t* valid_positions){
     reset_valid_positions(valid_positions);
     for(int i=0;i<frontier->actual;i++){
         position_t p = {frontier->positions[i].x,frontier->positions[i].y};
         //printf("test de (%d,%d)\n",p.x,p.y);
-        if(check_matching_zones(b,tile,p)){
-            //printf("placement possible\n");
-            add_to_valid_positions(valid_positions,p);
+        for(int j=0;j<4;j++){
+            if(check_matching_zones(b,tile,p)){
+                if(!is_in_valid_positions(valid_positions,p)){
+                     add_to_valid_positions(valid_positions,p);
+                }
+            }
+            rotate_tile(&tile,NINETY);
         }
     }
 }
