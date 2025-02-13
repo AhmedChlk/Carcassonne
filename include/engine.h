@@ -21,5 +21,7 @@ void remove_from_frontier(frontiers_t* frontier, position_t pos);
 void update_frontier_after_placement(board_t* board, frontiers_t* frontier, position_t pos);
 void place_tile(board_t* board, frontiers_t* frontier, tile_t tile, position_t pos);
 void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t pos, color_t c);
+void Remove_meeple(board_t* board, game_players_t* p, direction_t d, position_t pos, color_t c);
+
 
 #endif
