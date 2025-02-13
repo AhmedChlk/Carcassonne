@@ -1,6 +1,5 @@
 *.o
 *.out
-main.c
-test.c
+src/main.c
 bin/
 build/
