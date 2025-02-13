@@ -268,7 +268,6 @@ void place_tile(board_t* board, frontiers_t* frontier, tile_t tile, position_t p
     }
 }
 
-<<<<<<< HEAD
 // Meeple functions 
 
 void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t pos, color_t c)
@@ -296,7 +295,6 @@ void remove_meeple(board_t* board, game_players_t* p, direction_t d, position_t 
         if (p->players[i].meeple_color == c) p->players[i].meeples++;
     
 }
-=======
 valid_positions_t* allocate_valid_positions(){
     valid_positions_t* v = (valid_positions_t*) malloc (sizeof(valid_positions_t));
     v->actual = 0;
@@ -369,4 +367,3 @@ void get_placement_tile (board_t* b,frontiers_t* frontier,tile_t tile,valid_posi
         }
     }
 }
->>>>>>> main
