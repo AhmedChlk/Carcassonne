@@ -35,4 +35,8 @@ void add_to_valid_positions (valid_positions_t* v,position_t pos);
 bool check_matching_zones(board_t* board,tile_t tile,position_t pos);
 void get_placement_tile (board_t* b,frontiers_t* frontier,tile_t tile,valid_positions_t* valid_positions);
 
+
+ 
+void expand_board(board_t* board);
+
 #endif

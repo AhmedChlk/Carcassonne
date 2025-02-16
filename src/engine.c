@@ -367,3 +367,36 @@ void get_placement_tile (board_t* b,frontiers_t* frontier,tile_t tile,valid_posi
         }
     }
 }
+
+ 
+void expand_board(board_t* board) {
+    int new_width = board->width * 2;
+    int new_height = board->height * 2;
+    
+    // Nouvelle grille
+    tile_t** new_grid = (tile_t**)malloc(new_height * sizeof(tile_t*));
+    for (int i = 0; i < new_height; i++) {
+        new_grid[i] = (tile_t*)calloc(new_width, sizeof(tile_t));
+    }
+
+    // Copier old grid
+    int offset_x = board->width / 2;
+    int offset_y = board->height / 2;
+    
+    for (int i = 0; i < board->height; i++) {
+        for (int j = 0; j < board->width; j++) {
+            new_grid[i + offset_y][j + offset_x] = board->grid[i][j];
+        }
+    }
+
+    // free  old grid 
+    for (int i = 0; i < board->height; i++) {
+        free(board->grid[i]);
+    }
+    free(board->grid);
+
+    // update new dimension
+    board->grid = new_grid;
+    board->width = new_width;
+    board->height = new_height;
+}
