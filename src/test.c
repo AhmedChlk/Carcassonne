@@ -72,18 +72,15 @@ void print_board(board_t* b) {
 
 int main() {
     srand(time(NULL));
-    board_t* b = initialize_board(5,5);
+    board_t* b = initialize_board(10,10);
     frontiers_t*f = allocate_frontier();
     valid_positions_t* v = allocate_valid_positions();
     assert(v != NULL);
     tiles_pack_t tp = initialize_tile_pack("tiles.csv");
+    place_tile(b, f, tp.tiles[0], (position_t){b->height/2, b->width/2});
     shuffle_tile_pack(&tp);
     tile_t t = pick_tile(&tp);
-    t = pick_tile(&tp);
-    place_tile(b,f,t,(position_t){1,2});
-    t = pick_tile(&tp);
-    place_tile(b,f,t,(position_t){2,2});
-    t = pick_tile(&tp);
+    //place_tile(b, f, t, (position_t){5, 4});
     print_board(b);
     printf("tile a jouer : \n");
     print_tile(t);

@@ -8,6 +8,20 @@
 #include "player.h"
 
 board_t* initialize_board(int height, int width) {
+
+    /*This function allows to initialize the board of the game
+      * Input : 
+        * (height) : The height of the board (which is 72 according to the number of tiles)
+        * (width)  : The width of the board (= height in this game)
+      * Output :
+        * (board) : the board with dimension (height x width) initialized (i.e no meeple, no zones, no direction and no color)
+      * Process :
+        * Allocate the board (using (board_t) structre)
+        * Initialize the height and width (input)
+        * Allocate the tiles (heifht X width) then initialize them with no meeple (1), no zones (5), no direction (1) and no color (1)
+        * Return board
+     */
+
     board_t* board = (board_t*) malloc(sizeof(board_t));
     if (board == NULL) {
         fprintf(stderr, "Error allocating memory for board\n");
@@ -33,6 +47,15 @@ board_t* initialize_board(int height, int width) {
 }
 
 void free_board(board_t* board) {
+
+    /* This function de-allocate the space allocated for board by the function **initialize_board()**
+        * Input : 
+            * (board) : the board allocated
+        * Process :
+            * De-allocate every column in the board
+            * De-allocate the rows 
+            * De-allocate the struct 
+    */
     for (int i = 0; i < board->height; i++) {
         free(board->grid[i]);
     }
@@ -367,3 +390,4 @@ void get_placement_tile (board_t* b,frontiers_t* frontier,tile_t tile,valid_posi
         }
     }
 }
+
