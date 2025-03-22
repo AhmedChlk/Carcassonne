@@ -328,22 +328,26 @@ void add_to_valid_positions (valid_positions_t* v,position_t pos){
         v->valid_positions[v->actual++] = pos;
         //printf("ajout de (%d,%d) dans le tableau de positions\n",pos.x,pos.y);
 }
-
-bool check_matching_zones(board_t* board,tile_t tile,position_t pos){
+bool check_matching_zones(board_t* board, tile_t tile, position_t pos) {
     position_t delta[4] = { {-1, 0}, {0, 1}, {1, 0}, {0, -1} };
-    direction_t d[4] = {SOUTH,WEST,NORTH,EAST};
+    direction_t d[4] = {SOUTH, WEST, NORTH, EAST};
     for (int k = 0; k < 4; k++) {
         int nx = pos.x + delta[k].x;
         int ny = pos.y + delta[k].y;
         if (nx >= 0 && nx < board->height && ny >= 0 && ny < board->width) {
-            if(board->grid[nx][ny].zones[d[k]] != NONE){
-                if (tile.zones[k] != board->grid[nx][ny].zones[d[k]])
-                    return false;
+            if (board->grid[nx][ny].zones[d[k]] != NONE) {
+                if (tile.zones[k] != board->grid[nx][ny].zones[d[k]]) {
+                    if (!((tile.zones[k] == SHIELD && board->grid[nx][ny].zones[d[k]] == CITY) ||
+                          (tile.zones[k] == CITY && board->grid[nx][ny].zones[d[k]] == SHIELD))) {
+                        return false;
+                    }
+                }
             }
         }
     }
     return true;
 }
+
 bool is_in_valid_positions(valid_positions_t* v,position_t p){
     for(int i=0;i<v->actual;i++){
         if(v->valid_positions[i].x == p.x && v->valid_positions[i].y == p.y ){
