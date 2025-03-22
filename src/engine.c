@@ -371,3 +371,32 @@ void get_placement_tile (board_t* b,frontiers_t* frontier,tile_t tile,valid_posi
     }
     
 }
+
+// Fonction d'initialisation de la partie
+game_t init_game(int board_height, int board_width, const char* tile_csv) {
+    game_t game;
+    game.board = initialize_board(board_height, board_width);
+    game.frontier = allocate_frontier();
+    game.valid_positions = allocate_valid_positions();
+    
+    game.tile_pack = initialize_tile_pack(tile_csv);
+    
+    if (game.tile_pack.remaining_tiles <= 0) {
+        fprintf(stderr, "Error: No tiles available in the tile pack.\n");
+        exit(EXIT_FAILURE);
+    }
+    tile_t temp = game.tile_pack.tiles[0];
+    game.tile_pack.tiles[0] = game.tile_pack.tiles[game.tile_pack.remaining_tiles - 1];
+    game.tile_pack.tiles[game.tile_pack.remaining_tiles - 1] = temp;
+    
+    tile_t starting_tile = pick_tile(&game.tile_pack);
+    int center_x = board_height / 2;
+    int center_y = board_width / 2;
+    position_t center = { center_x, center_y };
+    place_tile(game.board,game.frontier, starting_tile, center);
+    shuffle_tile_pack(&game.tile_pack);
+    game.players = create_players();
+    
+    return game;
+}
+

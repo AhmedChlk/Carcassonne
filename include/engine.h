@@ -5,6 +5,16 @@
 #include "player.h"
 #include "tile.h"
 
+typedef struct {
+    board_t* board;
+    tiles_pack_t tile_pack;
+    game_players_t players;
+    frontiers_t* frontier;
+    valid_positions_t* valid_positions;
+} game_t;
+
+
+
 board_t* initialize_board(int height, int width);
 void free_board(board_t* board);
 tiles_pack_t initialize_tile_pack(const char* filename);
@@ -34,5 +44,8 @@ void reset_valid_positions(valid_positions_t* v);
 void add_to_valid_positions (valid_positions_t* v,position_t pos);
 bool check_matching_zones(board_t* board,tile_t tile,position_t pos);
 void get_placement_tile (board_t* b,frontiers_t* frontier,tile_t tile,valid_positions_t* valid_positions);
+
+
+game_t init_game(int board_height, int board_width, const char* tile_csv);
 
 #endif
