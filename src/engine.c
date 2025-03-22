@@ -358,16 +358,16 @@ bool is_in_valid_positions(valid_positions_t* v,position_t p){
 }
 void get_placement_tile (board_t* b,frontiers_t* frontier,tile_t tile,valid_positions_t* valid_positions){
     reset_valid_positions(valid_positions);
-    for(int i=0;i<frontier->actual;i++){
-        position_t p = {frontier->positions[i].x,frontier->positions[i].y};
-        //printf("test de (%d,%d)\n",p.x,p.y);
-        for(int j=0;j<4;j++){
-            if(check_matching_zones(b,tile,p)){
-                if(!is_in_valid_positions(valid_positions,p)){
-                     add_to_valid_positions(valid_positions,p);
-                }
+    for (int i = 0; i < frontier->actual; i++) {
+        position_t p = { frontier->positions[i].x, frontier->positions[i].y };
+        tile_t temp = tile;
+        for (int j = 0; j < 4; j++) {
+            if (check_matching_zones(b, temp, p)) {
+                if (!is_in_valid_positions(valid_positions, p))
+                    add_to_valid_positions(valid_positions, p);
             }
-            rotate_tile(&tile,NINETY);
+            rotate_tile(&temp, NINETY);
         }
     }
+    
 }
