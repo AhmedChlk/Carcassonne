@@ -116,8 +116,8 @@ game_players_t create_players() {
         game_players.players[i].is_ai = false;
     }
     if (num_players < 5) {
-        char answer;
-        int num_ai;
+        char answer = 'n';
+        int num_ai = 0;
         if (num_players > 1) {
             printf("Do you want to include AI players in the game? (y/n): ");
             scanf(" %c", &answer);
@@ -130,21 +130,23 @@ game_players_t create_players() {
                 printf("Enter the number of AI players you want (max %d): ", 5 - num_players);
                 while (getchar() != '\n');
             }
-            game_players.players = (player_t*) realloc(game_players.players, (num_players + num_ai) * sizeof(player_t));
-            for (int i = num_players; i < num_players + num_ai; i++) {
-                int ai_num = i - num_players + 1;
+            int base_players = game_players.num_players;
+            game_players.players = (player_t*) realloc(game_players.players, (base_players + num_ai) * sizeof(player_t));
+            for (int i = 0; i < num_ai; i++) {
+                int index = base_players + i;
                 char ai_name[16];
-                snprintf(ai_name, sizeof(ai_name), "AI_%d", ai_num);
-                game_players.players[i].meeple_color = available_colors[i];
-                game_players.players[i].meeples = NB_MEEPLES;
-                game_players.players[i].is_ai = true;
-                strcpy(game_players.players[i].name, ai_name);
-                game_players.num_players++;
+                snprintf(ai_name, sizeof(ai_name), "AI_%d", i + 1);
+                game_players.players[index].meeple_color = available_colors[index];
+                game_players.players[index].meeples = NB_MEEPLES;
+                game_players.players[index].is_ai = true;
+                strcpy(game_players.players[index].name, ai_name);
             }
+            game_players.num_players = base_players + num_ai;
         }
     }
     return game_players;
 }
+
 
 tile_t pick_tile(tiles_pack_t* tile_pack) {
     tile_t t = tile_pack->tiles[tile_pack->remaining_tiles - 1];
@@ -268,12 +270,9 @@ void place_tile(board_t* board, frontiers_t* frontier, tile_t tile, position_t p
     }
 }
 
-// Meeple functions 
-
 void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t pos, color_t c)
 {
     /*Place the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)*/
-
     board->grid[pos.x][pos.y].meeple_position = d;
     board->grid[pos.x][pos.y].meeple_color = c;
     board->grid[pos.x][pos.y].has_meeple = true;
@@ -286,7 +285,6 @@ void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t p
 void remove_meeple(board_t* board, game_players_t* p, direction_t d, position_t pos, color_t c)
 {
     /*Remove the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)*/
-
     board->grid[pos.x][pos.y].meeple_position = NO_DIRECTION;
     board->grid[pos.x][pos.y].meeple_color = NO_COLOR;
     board->grid[pos.x][pos.y].has_meeple = false;
