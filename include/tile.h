@@ -65,4 +65,12 @@ typedef struct {
     int remaining_tiles;
 } tiles_pack_t;
 
+/*
+   Structure pour stocker les zones d’une tuile où l’on peut poser le meeple.
+   La valeur true indique que le placement est autorisé pour cette zone.
+*/
+typedef struct {
+    bool available[5];
+} meeple_options_t;
+
 #endif

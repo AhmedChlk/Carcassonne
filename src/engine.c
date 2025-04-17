@@ -5,6 +5,7 @@
 #include <time.h>
 #include "board.h"
 #include "tile.h"
+#include "engine.h"
 #include "player.h"
 
 board_t* initialize_board(int height, int width) {
@@ -15,7 +16,7 @@ board_t* initialize_board(int height, int width) {
     }
     board->height = height;
     board->width = width;
-    board->grid = (tile_t**) malloc(height * sizeof(tile_t*));
+    board->grid = (tile_t*) malloc(height * sizeof(tile_t));
     for (int i = 0; i < height; i++) {
         board->grid[i] = (tile_t*) malloc(width * sizeof(tile_t));
     }
@@ -272,7 +273,7 @@ void place_tile(board_t* board, frontiers_t* frontier, tile_t tile, position_t p
 
 void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t pos, color_t c)
 {
-    /*Place the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)*/
+    /Place the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)/
     board->grid[pos.x][pos.y].meeple_position = d;
     board->grid[pos.x][pos.y].meeple_color = c;
     board->grid[pos.x][pos.y].has_meeple = true;
@@ -282,9 +283,9 @@ void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t p
     
 }
 
-void remove_meeple(board_t* board, game_players_t* p, direction_t d, position_t pos, color_t c)
+void remove_meeple(board_t* board, game_players_t* p, position_t pos, color_t c)
 {
-    /*Remove the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)*/
+    /Remove the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)/
     board->grid[pos.x][pos.y].meeple_position = NO_DIRECTION;
     board->grid[pos.x][pos.y].meeple_color = NO_COLOR;
     board->grid[pos.x][pos.y].has_meeple = false;
@@ -398,3 +399,124 @@ game_t init_game(int board_height, int board_width, const char* tile_csv) {
     return game;
 }
 
+bool feature_matches(zone_type_t a, zone_type_t b) {
+    if (a == b)
+        return true;
+    if ((a == CITY && b == SHIELD) || (a == SHIELD && b == CITY))
+        return true;
+    return false;
+}
+
+
+
+
+/* DFS qui part de la tuile (x, y) au côté 'zone' et qui vérifie si le réseau 
+   connecté, caractérisé par 'target', possède déjà un meeple.
+   Le tableau visited (de taille board->height * board->width * 5) permet d’éviter
+   les cycles.
+*/
+bool dfs_has_meeple(board_t* board, int x, int y, int zone, zone_type_t target, bool *visited) {
+    int idx = (x * board->width + y) * 5 + zone;
+    if (visited[idx])
+        return false;
+    visited[idx] = true;
+
+    tile_t *tile = &board->grid[x][y];
+
+    // Si la zone actuelle porte déjà un meeple, on retourne true
+    if (tile->has_meeple && tile->meeple_position == zone)
+        return true;
+
+    /* Parcours intra-tuile : 
+       - Si on est sur le centre, on peut explorer toutes les zones de la tuile.
+       - Sinon, on n’explore que si le centre correspond au type recherché (i.e. il "relie" les zones).
+    */
+    if (zone == CENTER || feature_matches(tile->zones[CENTER], target)) {
+        for (int i = 0; i < 5; i++) {
+            if (i != zone && feature_matches(tile->zones[i], target)) {
+                int idx2 = (x * board->width + y) * 5 + i;
+                if (!visited[idx2]) {
+                    if (tile->has_meeple && tile->meeple_position == i)
+                        return true;
+                    if (dfs_has_meeple(board, x, y, i, target, visited))
+                        return true;
+                }
+            }
+        }
+    }
+
+    /* Parcours inter-tuile : 
+       Si la zone est un côté (NORD, EST, SUD ou OUEST), on regarde la tuile voisine dans 
+       la direction opposée et on explore la zone correspondante.
+    */
+    if (zone < 4) {
+        int nx = x, ny = y, opp = -1;
+        if (zone == NORTH) { nx = x - 1; opp = SOUTH; }
+        else if (zone == EAST) { ny = y + 1; opp = WEST; }
+        else if (zone == SOUTH) { nx = x + 1; opp = NORTH; }
+        else if (zone == WEST) { ny = y - 1; opp = EAST; }
+
+        if (nx >= 0 && nx < board->height && ny >= 0 && ny < board->width) {
+            tile_t *neighbor = &board->grid[nx][ny];
+            if (feature_matches(neighbor->zones[opp], target)) {
+                int idx3 = (nx * board->width + ny) * 5 + opp;
+                if (!visited[idx3]) {
+                    if (neighbor->has_meeple && neighbor->meeple_position == opp)
+                        return true;
+                    if (dfs_has_meeple(board, nx, ny, opp, target, visited))
+                        return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+/* Fonction simplifiée qui retourne pour la tuile à la position 'pos' les zones
+   sur lesquelles il est possible de placer un meeple. On ne considère que :
+     - ABBEY : placement autorisé si la tuile ne porte aucun meeple.
+     - ROAD et CITY/SHIELD : placement autorisé si le réseau connecté ne comporte aucun meeple.
+   Les autres types (par exemple FIELD, VILLAGE) ne sont pas traités.
+*/
+meeple_options_t get_placement_meeple(board_t* board, position_t pos) {
+    meeple_options_t options = {{ false, false, false, false, false }};
+    tile_t *tile = &board->grid[pos.x][pos.y];
+
+    // Si la tuile porte déjà un meeple, aucune zone n'est disponible
+    if (tile->has_meeple) {
+        return options;
+    }
+
+    int total_states = board->height * board->width * 5;
+    bool *visited = calloc(total_states, sizeof(bool));
+    if (!visited) {
+        fprintf(stderr, "Erreur d'allocation mémoire\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int zone = 0; zone < 5; zone++) {
+        zone_type_t type = tile->zones[zone];
+        if (type == NONE)
+            continue;
+
+        if (type == ABBEY) {
+            // Abbaye libre si pas déjà de meeple
+            options.available[zone] = true;
+
+        } else if (type == ROAD || type == CITY || type == SHIELD) {
+            // On réinitialise visited pour chaque recherche
+            for (int i = 0; i < total_states; i++) {
+                visited[i] = false;
+            }
+
+            // Si aucun meeple dans le même réseau, on peut placer
+            if (!dfs_has_meeple(board, pos.x, pos.y, zone, type, visited)) {
+                options.available[zone] = true;
+            }
+        }
+        // Les autres types (FIELD, VILLAGE…) ne sont pas traités
+    }
+
+    free(visited);
+    return options;
+}
