@@ -53,7 +53,7 @@ game_t init_game(int board_height, int board_width, const char* tile_csv);
 
 /* Valid positions for meeple placement */
 bool dfs_has_meeple(board_t* board, int x, int y, int zone, zone_type_t target, bool *visited);
-meeple_options_t get_placement_meeple(board_t* board, position_t pos);
+meeple_options_t get_placement_meeple(board_t* board, position_t pos);
 
 
 

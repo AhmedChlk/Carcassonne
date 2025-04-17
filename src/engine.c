@@ -273,7 +273,7 @@ void place_tile(board_t* board, frontiers_t* frontier, tile_t tile, position_t p
 
 void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t pos, color_t c)
 {
-    /Place the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)/
+    //Place the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)/
     board->grid[pos.x][pos.y].meeple_position = d;
     board->grid[pos.x][pos.y].meeple_color = c;
     board->grid[pos.x][pos.y].has_meeple = true;
@@ -285,7 +285,7 @@ void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t p
 
 void remove_meeple(board_t* board, game_players_t* p, position_t pos, color_t c)
 {
-    /Remove the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)/
+    //Remove the meeple in tile (pos(x, y)) with the color (c) in direction(d) for the current player in players(p)/
     board->grid[pos.x][pos.y].meeple_position = NO_DIRECTION;
     board->grid[pos.x][pos.y].meeple_color = NO_COLOR;
     board->grid[pos.x][pos.y].has_meeple = false;
@@ -518,5 +518,5 @@ meeple_options_t get_placement_meeple(board_t* board, position_t pos) {
     }
 
     free(visited);
-    return options;
+    return options;
 }

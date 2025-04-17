@@ -5,6 +5,23 @@
 #include <time.h>
 #include "engine.h"
 
+
+#define ANSI_RED    "\x1b[31m"
+#define ANSI_BLUE   "\x1b[34m"
+#define ANSI_GREEN  "\x1b[32m"
+#define ANSI_YELLOW "\x1b[33m"
+#define ANSI_WHITE  "\x1b[37m"
+#define ANSI_RESET  "\x1b[0m"
+
+const char *ANSI_COLOR_CODES[] = {
+    [RED]      = ANSI_RED,
+    [BLUE]     = ANSI_BLUE,
+    [GREEN]    = ANSI_GREEN,
+    [YELLOW]   = ANSI_YELLOW,
+    [WHITE]    = ANSI_WHITE,
+    [NO_COLOR] = ANSI_RESET
+};
+
 char print_zone(zone_type_t z) {
     switch (z) {
         case SHIELD:  return 's';
@@ -106,40 +123,6 @@ void print_meeple_options(board_t* b, position_t pos) {
     }
     if (!any) printf(" aucune");
     printf("\n");
-}
-
-
-
-int main() {
-    srand(time(NULL));
-    board_t* b = initialize_board(5,5);
-    frontiers_t*f = allocate_frontier();
-    valid_positions_t* v = allocate_valid_positions();
-    assert(v != NULL);
-    tiles_pack_t tp = initialize_tile_pack("tiles.csv");
-    shuffle_tile_pack(&tp);
-    tile_t t = pick_tile(&tp);
-    t = pick_tile(&tp);
-    place_tile(b,f,t,(position_t){1,2});
-    t = pick_tile(&tp);
-    place_tile(b,f,t,(position_t){2,2});
-    t = pick_tile(&tp);
-    print_board(b);
-    printf("tile a jouer : \n");
-    print_tile(t);
-
-    printf("les frontieres :");
-    for(int i=0;i<f->actual;i++){
-        printf("(%d,%d) ",f->positions[i].x,f->positions[i].y);
-    }
-    printf("\n");
-    get_placement_tile(b,f,t,v);
-    printf("placement possible : ");
-    for(int i=0;i<v->actual;i++){
-        printf("(%d,%d)",v->valid_positions[i].x,v->valid_positions[i].y);
-    }
-    printf("\n");
-    return 0;
 }
 
 int main(void) {
