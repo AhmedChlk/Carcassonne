@@ -31,7 +31,7 @@ $(BUILD) $(BIN):
 
 # cleaning the compiled filess
 clean:
-	rm -rf $(BUILD) $(BIN)
+	rm -rf $(BUILD) $(BIN) code.txt
 
 # run the program
 run: all

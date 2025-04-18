@@ -1,4 +1,3 @@
-// main.c
 #include <stdlib.h>
 #include "engine.h"
 #include "gui.h"
