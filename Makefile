@@ -1,31 +1,52 @@
-TARGET = bin/main.exe
-CC = gcc
-CFLAGS = -Wall -g -Wextra
+SHELL := /bin/bash
 
-SRC_DIR = src
-BUILD_DIR = build
-BIN_DIR = bin
-INCLUDE_DIR = include
+# Directories
+SRC       := src
+BUILD     := build
+BIN       := bin
+INC       := include
 
-SRCS = $(wildcard $(SRC_DIR)/*.c)
-OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRCS))
+# Compiler and flags
+CC        := gcc
+CFLAGS    := -Wall -Wextra -I$(INC)
+LDFLAGS   := -lncurses
 
-all : $(TARGET)
+# Source files and objects
+SRCS      := $(wildcard $(SRC)/*.c)
+OBJS      := $(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(SRCS))
+TARGET    := $(BIN)/main
 
-$(TARGET) : $(OBJS) | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $^
+.PHONY: all clean run generate_code
 
-$(BUILD_DIR)/%.o : $(SRC_DIR)/%.c | $(BUILD_DIR)
-	$(CC) -I$(INCLUDE_DIR) -c $< -o $@
+all: $(TARGET)
 
-$(BUILD_DIR) :
-	mkdir -p $(BUILD_DIR)
+$(TARGET): $(OBJS) | $(BIN)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
-$(BIN_DIR) :
-	mkdir -p $(BIN_DIR)
+$(BUILD)/%.o: $(SRC)/%.c | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-clean :
-	rm -f $(BUILD_DIR)/*.o $(TARGET)
+$(BUILD) $(BIN):
+	mkdir -p $@
 
-run : 
-	@./bin/main.exe
+# cleaning the compiled filess
+clean:
+	rm -rf $(BUILD) $(BIN)
+
+# run the program
+run: all
+	$(TARGET)
+
+# Generate a code snapshot
+generate_code:
+	@echo "===== PROJECT TREE =====" > code.txt
+	@tree -I '.*' >> code.txt
+	@echo -e "\n===== FILE CONTENTS =====" >> code.txt
+	@find . -type f \
+		! -path "./.*" \
+		! -path "*/.*" \
+		! -name code.txt | while read -r file; do \
+		echo "----- $$file -----" >> code.txt; \
+		cat "$$file" >> code.txt; \
+		echo "" >> code.txt; \
+	done
