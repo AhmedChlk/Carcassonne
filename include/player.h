@@ -8,11 +8,12 @@
 #define NB_MEEPLES 7  
 
 // Structure d'un joueur humain ou IA
-typedef struct {
+typedef struct player_t {
     char    name[50];
     int     meeples;
     color_t meeple_color;
     bool    is_ai;
+    int     score;       // ajout du score
 } player_t;
 
 // Liste des joueurs et leur nombre
@@ -21,4 +22,4 @@ typedef struct {
     int       num_players;
 } game_players_t;
 
-#endif
+#endif // PLAYER_H

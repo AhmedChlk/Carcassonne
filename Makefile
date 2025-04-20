@@ -8,7 +8,9 @@ INC       := include
 
 # Compiler and flags
 CC        := gcc
-CFLAGS    := -Wall -Wextra -I$(INC)
+CFLAGS := -Wall -Wextra \
+          -Wpedantic \
+          -I$(INC) -g
 LDFLAGS   := -lncurses
 
 # Source files and objects
