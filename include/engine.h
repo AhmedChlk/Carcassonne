@@ -93,4 +93,8 @@ bool dfs_has_meeple(board_t* board, int x, int y, direction_t zone, zone_type_t 
 // Retourne pour une tuile les zones où on peut placer un meeple
 meeple_options_t get_placement_meeple(board_t* board, position_t pos);
 
+
+void score_completed_structures(game_t* G, position_t last_pos);
+
+void free_game(game_t* game);
 #endif
