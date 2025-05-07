@@ -1,25 +1,24 @@
 #ifndef GUI_H
 #define GUI_H
 
-#include <ncurses.h>
-#include "engine.h"
-//hauteur et largeur d'une tuile en caracteres 
-#define TILE_WIDTH  3  
-#define TILE_HEIGHT 3
+#include "board.h"
+#include "tile.h"
+#include "controller.h"  // pour position_t
 
-// espace réservé aux étiquettes
-#define LABEL_WIDTH 4  
+char print_zone(zone_type_t z);
+void print_tile(tile_t t);
+void gui_display_positions(valid_positions_t* v);
+void gui_set_valid_positions(valid_positions_t* v);
+void gui_show_current_tile(tile_t tile, degree_t rotation);
+void gui_display_meeple_options(meeple_options_t opts, color_t player_color);
 
-// Convertit une couleur en paire ncurses
-int color_to_pair(color_t c);
+/**
+ * \brief Affiche une fenêtre paginée 10×5 du plateau 144×144,
+ *        surligne en vert les cases valides et reverse-video la case du curseur.
+ */
+void print_board(board_t *board,
+                 int offsetX, int offsetY,
+                 int viewW,   int viewH,
+                 position_t cursor);
 
-// Dessine toutes les tuiles dans le pad
-void draw_board_pad(WINDOW *pad, board_t *b);
-
-// Affiche les numéros de ligne et colonne
-void draw_labels(int row_off, int col_off, int map_h, int scr_w, board_t *b);
-
-// Lance l'interface graphique ncurses pour la grille
-void run_gui(board_t *b);
-
-#endif
+#endif // GUI_H

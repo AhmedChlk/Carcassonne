@@ -1,162 +1,254 @@
 #include "gui.h"
 #include "engine.h"
-#include <ncurses.h>
-#include <stdlib.h>
+#include <stdio.h>
 
-// Convertit un type de zone en caractère pour l'affichage
+#define ZC_RESET   "\033[0m"
+#define BG_GREEN   "\033[42m"
+#define REV_VIDEO  "\033[7m"
+
+static valid_positions_t* g_valid = NULL;
+
+void gui_set_valid_positions(valid_positions_t* v) {
+    g_valid = v;
+}
+
+void gui_show_current_tile(tile_t tile, degree_t rotation) {
+    tile_t tmp = tile;
+    for (int r = 0; r < (int)rotation; r++)
+        rotate_tile(&tmp, NINETY);
+    printf("Tuile courante (rotation %d°) :\n", rotation * 90);
+    print_tile(tmp);
+}
+
 char print_zone(zone_type_t z) {
     switch (z) {
-        case SHIELD:  return 's';  // bouclier
-        case ROAD:    return 'r';  // route
-        case FIELD:   return 'f';  // champ
-        case CITY:    return 'c';  // ville
-        case VILLAGE: return 'v';  // village
-        case ABBEY:   return 'a';  // abbaye
-        case NONE:    return ' ';  // rien
+        case SHIELD:  return 'S';
+        case ROAD:    return 'R';
+        case FIELD:   return 'F';
+        case CITY:    return 'C';
+        case VILLAGE: return 'V';
+        case ABBEY:   return 'A';
         default:      return ' ';
     }
 }
 
-
-int color_to_pair(color_t c) {
-    return (c == NO_COLOR ? 0 : (int)c + 1);
+static const char* zone_color(zone_type_t z) {
+    switch (z) {
+        case CITY:    return "\033[0;31m";
+        case ROAD:    return "\033[0;33m";
+        case FIELD:   return "\033[0;32m";
+        case SHIELD:  return "\033[0;35m";
+        case VILLAGE: return "\033[0;36m";
+        case ABBEY:   return "\033[0;37m";
+        default:      return ZC_RESET;
+    }
 }
 
-void draw_board_pad(WINDOW *pad, board_t *b) {
-    // Têtes de colonnes (numéros en haut)
-    for (int j = 0; j < b->width; j++) {
-        int x0 = LABEL_WIDTH + j * TILE_WIDTH;
-        mvwprintw(pad, 0, x0, "%*d", TILE_WIDTH, j);
+void print_tile(tile_t t) {
+    printf("\033[1m\033[0;37m┌───┐\n" ZC_RESET);
+    printf("│ %s%c" ZC_RESET " │\n",
+           zone_color(t.zones[NORTH]), print_zone(t.zones[NORTH]));
+    printf("│%s%c" ZC_RESET "%s%c" ZC_RESET "%s%c" ZC_RESET "│\n",
+           zone_color(t.zones[WEST]),   print_zone(t.zones[WEST]),
+           zone_color(t.zones[CENTER]), print_zone(t.zones[CENTER]),
+           zone_color(t.zones[EAST]),   print_zone(t.zones[EAST]));
+    printf("│ %s%c" ZC_RESET " │\n",
+           zone_color(t.zones[SOUTH]), print_zone(t.zones[SOUTH]));
+    printf("\033[1m\033[0;37m└───┘\n" ZC_RESET);
+}
+
+void gui_display_positions(valid_positions_t* v) {
+    printf("\n\033[0;36m╭─ Positions valides ─────────────────╮\033[0m\n");
+    for (int i = 0; i < v->actual; i++) {
+        printf(" [%2d] (%2d,%2d)   ",
+               i,
+               v->valid_positions[i].x,
+               v->valid_positions[i].y);
+        if ((i + 1) % 2 == 0) printf("\n");
     }
+    if (v->actual % 2) printf("\n");
+    printf("\033[0;36m╰──────────────────────────────────────╯\033[0m\n\n");
+}
 
-    // Parcours de chaque tuile (i = ligne, j = colonne)
-    for (int i = 0; i < b->height; i++) {
-        int base_y = 1 + i * TILE_HEIGHT;
-
-        // Bord nord de la tuile
-        for (int j = 0; j < b->width; j++) {
-            tile_t *t = &b->grid[i][j];
-            char c = print_zone(t->zones[NORTH]);
-            int x = LABEL_WIDTH + j * TILE_WIDTH + TILE_WIDTH/2;
-            mvwprintw(pad, base_y, x, "%c", c);
+void gui_display_meeple_options(meeple_options_t opts, color_t player_color) {
+    (void)player_color;
+    printf("\033[0;35m╭─ Options meeple ────────────────────╮\033[0m\n");
+    const char* names[5] = { "Nord", "Est", "Sud", "Ouest", "Centre" };
+    const char  keys[5]  = { 'N',     'E',     'S',     'W',      'C' };
+    for (int i = 0; i < 5; i++) {
+        if (opts.available[i]) {
+            printf("%s [%c] %-6s %s   ",
+                   BG_GREEN, keys[i], names[i], ZC_RESET);
+        } else {
+            printf(" [%c] %-6s   ", keys[i], names[i]);
         }
+        if ((i + 1) % 2 == 0) printf("\n");
+    }
+    if (5 % 2) printf("\n");
+    printf("\033[0;35m╰──────────────────────────────────────╯\033[0m\n\n");
+}
 
-        // Centre de la tuile + numéro de ligne à gauche
-        mvwprintw(pad, base_y+1, 0, "%3d", i);
-        for (int j = 0; j < b->width; j++) {
-            tile_t *t = &b->grid[i][j];
-            int x0 = LABEL_WIDTH + j * TILE_WIDTH;
-            for (int k = 0; k < TILE_WIDTH; k++) {
-                direction_t dir;
-                if (k == 0) dir = WEST;
-                else if (k == TILE_WIDTH-1) dir = EAST;
-                else dir = CENTER;
-                char ch = print_zone(t->zones[dir]);
-                mvwprintw(pad, base_y+1, x0 + k, "%c", ch);
+void print_board(board_t *board,
+                 int offsetX, int offsetY,
+                 int viewW,   int viewH,
+                 position_t cursor)
+{
+    printf("Vue : X=[%d…%d], Y=[%d…%d]\n",
+           offsetX, offsetX + viewW - 1,
+           offsetY, offsetY + viewH - 1);
+
+    if (offsetX < 0) offsetX = 0;
+    if (offsetY < 0) offsetY = 0;
+    if (offsetX + viewW > board->width)  viewW  = board->width  - offsetX;
+    if (offsetY + viewH > board->height) viewH  = board->height - offsetY;
+    if (viewW <= 0 || viewH <= 0) return;
+
+    for (int ty = 0; ty < viewH; ++ty) {
+        int by = offsetY + ty;
+
+        // Bordure haute
+        for (int tx = 0; tx < viewW; ++tx) {
+            int bx = offsetX + tx;
+            tile_t t = board->grid[by][bx];
+            bool hl_valid = false, hl_cursor = false;
+            if (g_valid) {
+                for (int i = 0; i < g_valid->actual; i++) {
+                    position_t vp = g_valid->valid_positions[i];
+                    if (vp.x == by && vp.y == bx) { hl_valid = true; break; }
+                }
             }
+            if (cursor.x == by && cursor.y == bx) hl_cursor = true;
+            if (hl_valid)  printf(BG_GREEN);
+            if (hl_cursor) printf(REV_VIDEO);
+            printf("\033[1m\033[0;37m┌───┐" ZC_RESET);
         }
+        printf("\n");
 
-        // Bord sud de la tuile
-        for (int j = 0; j < b->width; j++) {
-            tile_t *t = &b->grid[i][j];
-            char c = print_zone(t->zones[SOUTH]);
-            int x = LABEL_WIDTH + j * TILE_WIDTH + TILE_WIDTH/2;
-            mvwprintw(pad, base_y+2, x, "%c", c);
+        // Ligne Nord
+        for (int tx = 0; tx < viewW; ++tx) {
+            int bx = offsetX + tx;
+            tile_t t = board->grid[by][bx];
+            bool hl_valid = false, hl_cursor = false;
+            if (g_valid) {
+                for (int i = 0; i < g_valid->actual; i++) {
+                    position_t vp = g_valid->valid_positions[i];
+                    if (vp.x == by && vp.y == bx) { hl_valid = true; break; }
+                }
+            }
+            if (cursor.x == by && cursor.y == bx) hl_cursor = true;
+            if (hl_valid)  printf(BG_GREEN);
+            if (hl_cursor) printf(REV_VIDEO);
+
+            printf("│ ");
+            // si meeple présent au NORD, colorier ce caractère
+            if (t.has_meeple && t.meeple_position == NORTH) {
+                printf("%s%c%s",
+                       color_code(t.meeple_color),
+                       print_zone(t.zones[NORTH]),
+                       ZC_RESET);
+            } else {
+                printf("%c", print_zone(t.zones[NORTH]));
+            }
+            printf(" │");
+            printf(ZC_RESET);
         }
+        printf("\n");
+
+        // Ligne Ouest-Centre-Est
+        for (int tx = 0; tx < viewW; ++tx) {
+            int bx = offsetX + tx;
+            tile_t t = board->grid[by][bx];
+            bool hl_valid = false, hl_cursor = false;
+            if (g_valid) {
+                for (int i = 0; i < g_valid->actual; i++) {
+                    position_t vp = g_valid->valid_positions[i];
+                    if (vp.x == by && vp.y == bx) { hl_valid = true; break; }
+                }
+            }
+            if (cursor.x == by && cursor.y == bx) hl_cursor = true;
+            if (hl_valid)  printf(BG_GREEN);
+            if (hl_cursor) printf(REV_VIDEO);
+
+            printf("│");
+            // OUEST
+            if (t.has_meeple && t.meeple_position == WEST) {
+                printf("%s%c%s",
+                       color_code(t.meeple_color),
+                       print_zone(t.zones[WEST]),
+                       ZC_RESET);
+            } else {
+                printf("%c", print_zone(t.zones[WEST]));
+            }
+            // CENTRE
+            if (t.has_meeple && t.meeple_position == CENTER) {
+                printf("%s%c%s",
+                       color_code(t.meeple_color),
+                       print_zone(t.zones[CENTER]),
+                       ZC_RESET);
+            } else {
+                printf("%c", print_zone(t.zones[CENTER]));
+            }
+            // EST
+            if (t.has_meeple && t.meeple_position == EAST) {
+                printf("%s%c%s",
+                       color_code(t.meeple_color),
+                       print_zone(t.zones[EAST]),
+                       ZC_RESET);
+            } else {
+                printf("%c", print_zone(t.zones[EAST]));
+            }
+            printf("│");
+            printf(ZC_RESET);
+        }
+        printf("\n");
+
+        // Ligne Sud
+        for (int tx = 0; tx < viewW; ++tx) {
+            int bx = offsetX + tx;
+            tile_t t = board->grid[by][bx];
+            bool hl_valid = false, hl_cursor = false;
+            if (g_valid) {
+                for (int i = 0; i < g_valid->actual; i++) {
+                    position_t vp = g_valid->valid_positions[i];
+                    if (vp.x == by && vp.y == bx) { hl_valid = true; break; }
+                }
+            }
+            if (cursor.x == by && cursor.y == bx) hl_cursor = true;
+            if (hl_valid)  printf(BG_GREEN);
+            if (hl_cursor) printf(REV_VIDEO);
+
+            printf("│ ");
+            // si meeple présent au SUD, colorier ce caractère
+            if (t.has_meeple && t.meeple_position == SOUTH) {
+                printf("%s%c%s",
+                       color_code(t.meeple_color),
+                       print_zone(t.zones[SOUTH]),
+                       ZC_RESET);
+            } else {
+                printf("%c", print_zone(t.zones[SOUTH]));
+            }
+            printf(" │");
+            printf(ZC_RESET);
+        }
+        printf("\n");
+
+        // Bordure basse
+        for (int tx = 0; tx < viewW; ++tx) {
+            int bx = offsetX + tx;
+            bool hl_valid = false, hl_cursor = false;
+            int by = offsetY + ty; /* correction d’index dans cette boucle */
+            if (g_valid) {
+                for (int i = 0; i < g_valid->actual; i++) {
+                    position_t vp = g_valid->valid_positions[i];
+                    if (vp.x == by && vp.y == bx) { hl_valid = true; break; }
+                }
+            }
+            if (cursor.x == by && cursor.y == bx) hl_cursor = true;
+            if (hl_valid)  printf(BG_GREEN);
+            if (hl_cursor) printf(REV_VIDEO);
+
+            printf("\033[1m\033[0;37m└───┘" ZC_RESET);
+        }
+        printf("\n");
     }
-}
-
-void draw_labels(int row_off, int col_off, int map_h, int scr_w, board_t *b) {
-    int first_col = col_off / TILE_WIDTH;
-    int first_row = row_off / TILE_HEIGHT;
-    int max_cols  = (scr_w - LABEL_WIDTH)  / TILE_WIDTH;
-    int max_rows  = (map_h - TILE_HEIGHT/2) / TILE_HEIGHT;
-
-    // Colonnes
-    for (int j = 0; j <= max_cols && first_col + j < b->width; j++) {
-        int x0 = LABEL_WIDTH + j * TILE_WIDTH;
-        mvprintw(0, x0, "%*d", TILE_WIDTH, first_col + j);
-    }
-    // Lignes
-    for (int i = 0; i <= max_rows && first_row + i < b->height; i++) {
-        int y = 1 + i * TILE_HEIGHT + TILE_HEIGHT/2;
-        mvprintw(y, 0, "%3d", first_row + i);
-    }
-}
-
-// Point d'entrée de l'interface graphique
-void run_gui(board_t *b) {
-    initscr();    // démarre ncurses
-    noecho();     // ne pas afficher les touches
-    cbreak();     // mode brut
-    keypad(stdscr, TRUE);
-    curs_set(0);  // cacher le curseur
-
-    if (!has_colors()) {
-        endwin();
-        fprintf(stderr, "Erreur: pas de couleur\n");
-        return;
-    }
-    start_color();
-    init_pair(1, COLOR_RED,    COLOR_BLACK);
-    init_pair(2, COLOR_BLUE,   COLOR_BLACK);
-    init_pair(3, COLOR_GREEN,  COLOR_BLACK);
-    init_pair(4, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(5, COLOR_WHITE,  COLOR_BLACK);
-
-    int scr_h, scr_w;
-    getmaxyx(stdscr, scr_h, scr_w);
-    int info_h = 5;           // hauteur du panneau bas
-    int map_h  = scr_h - info_h;
-
-    int pad_h = 1 + b->height * TILE_HEIGHT;
-    int pad_w = LABEL_WIDTH + b->width  * TILE_WIDTH;
-    WINDOW *pad  = newpad(pad_h, pad_w);         // zone scrollable
-    WINDOW *info = newwin(info_h, scr_w, map_h, 0); // panneau de texte
-    scrollok(info, TRUE);
-
-    box(info, 0, 0); // bordure du panneau
-    mvwprintw(info, 1, 1, "Z/S/Q/D: déplacer, Esc: quitter");
-    wrefresh(info);
-
-    // Remplir le pad avec le plateau
-    draw_board_pad(pad, b);
-
-    // Centrage initial sur la tuile centrale
-    int mid_r = b->height/2;
-    int mid_c = b->width/2;
-    int ctr_y = map_h/2;
-    int ctr_x = scr_w/2;
-    int tile_py = 1 + mid_r*TILE_HEIGHT + TILE_HEIGHT/2;
-    int tile_px = LABEL_WIDTH + mid_c*TILE_WIDTH + TILE_WIDTH/2;
-    int row_off = (tile_py - ctr_y) / TILE_HEIGHT * TILE_HEIGHT;
-    int col_off = (tile_px - ctr_x) / TILE_WIDTH  * TILE_WIDTH;
-    if (row_off < 0) row_off = 0;
-    if (col_off < 0) col_off = 0;
-    if (row_off > pad_h-map_h) row_off = pad_h - map_h;
-    if (col_off > pad_w-scr_w) col_off = pad_w - scr_w;
-
-    // Affichage initial
-    prefresh(pad, row_off, col_off, 0, 0, map_h-1, scr_w-1);
-    draw_labels(row_off, col_off, map_h, scr_w, b);
-    refresh();
-
-    int ch;
-    // Boucle de gestion des touches
-    while ((ch = getch()) != 27) {
-        if (ch == 'z') row_off = row_off>=TILE_HEIGHT ? row_off-TILE_HEIGHT : 0;
-        if (ch == 's') row_off = row_off+TILE_HEIGHT <= pad_h-map_h ? row_off+TILE_HEIGHT : pad_h-map_h;
-        if (ch == 'q') col_off = col_off>=TILE_WIDTH  ? col_off-TILE_WIDTH  : 0;
-        if (ch == 'd') col_off = col_off+TILE_WIDTH  <= pad_w-scr_w  ? col_off+TILE_WIDTH  : pad_w-scr_w;
-
-        // Redessiner
-        prefresh(pad, row_off, col_off, 0, 0, map_h-1, scr_w-1);
-        draw_labels(row_off, col_off, map_h, scr_w, b);
-        wrefresh(info);
-    }
-
-    // Nettoyage
-    delwin(pad);
-    delwin(info);
-    endwin();
 }

@@ -2,12 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <time.h>
 #include "board.h"
 #include "tile.h"
 #include "engine.h"
 #include "player.h"
-
 
 static bool *scored = NULL;
 
@@ -40,14 +38,12 @@ board_t* initialize_board(int h, int w) {
     return bd;
 }
 
-
 void free_board(board_t* bd) {
     for (int i = 0; i < bd->height; i++)
         free(bd->grid[i]);
     free(bd->grid);
     free(bd);
 }
-
 
 tiles_pack_t initialize_tile_pack(const char* fn) {
     char path[256] = "data/";
@@ -90,31 +86,70 @@ void shuffle_tile_pack(tiles_pack_t* tp) {
     }
 }
 
-
-game_players_t create_players(void) {
+game_players_t create_players(){
     game_players_t gp;
-    color_t cols[5] = { RED, BLUE, GREEN, YELLOW, WHITE };
-    int np;
-    printf("Nbr joueurs (1-5) : ");
-    while (scanf("%d", &np) != 1 || np < 1 || np > 5) {
-        printf("Valeur invalide, retentez : ");
-        while (getchar() != '\n');
+    color_t tab_colors[5] = {RED,BLUE,GREEN,YELLOW,WHITE};
+    int nb_players;
+
+    printf("À combien de joueurs allez-vous jouer (min 1, max 5) : ");
+    while(scanf("%d",&nb_players) != 1  || nb_players < 1 || nb_players > 5){
+        printf("Erreur : entrez une valeur valide.\n");
+        printf("À combien de joueurs (1–5) : ");
+        while(getchar()!='\n');
     }
-    while (getchar() != '\n');
-    gp.num_players = np;
-    gp.players = malloc(np * sizeof(player_t));
-    for (int i = 0; i < np; i++) {
-        printf("Nom joueur %d: ", i + 1);
-        fgets(gp.players[i].name, 50, stdin);
+    while(getchar()!='\n');
+
+    // Allouer pour le maximum dès le départ !
+    gp.players = malloc(5 * sizeof(player_t));
+    gp.num_players = nb_players;
+
+    // Saisie des joueurs humains
+    for(int i = 0; i < nb_players; i++){
+        printf("Entrez le nom du joueur %d (max 50 car.) : ", i+1);
+        fgets(gp.players[i].name, sizeof(gp.players[i].name), stdin);
+        // Supprime le '\n' éventuel de fgets
         gp.players[i].name[strcspn(gp.players[i].name, "\n")] = '\0';
-        gp.players[i].meeple_color = cols[i];
+        gp.players[i].meeple_color = tab_colors[i];
         gp.players[i].meeples = NB_MEEPLES;
         gp.players[i].is_ai = false;
         gp.players[i].score = 0;
     }
+
+    // Si on peut ajouter des IA
+    if (nb_players < 5) {
+        char answer = '\0';
+        int nb_ia = 0;
+        printf("Voulez-vous inclure des IA ? (y/n) : ");
+        scanf(" %c", &answer);
+        while(getchar()!='\n');
+
+        if ((answer=='y' || answer=='Y') && nb_players < 5) {
+            printf("Entrez le nombre d'IA (0–%d) : ", 5 - nb_players);
+            while(scanf("%d", &nb_ia) != 1
+                  || nb_ia < 0 
+                  || nb_ia > 5 - nb_players) {
+                printf("Nombre invalide, retentez (0–%d) : ", 5 - nb_players);
+                while(getchar()!='\n');
+            }
+            while(getchar()!='\n');
+
+            // Ajout des IA dans le même tableau
+            for(int i = 0; i < nb_ia; i++){
+                int idx = nb_players + i;
+                snprintf(gp.players[idx].name,
+                         sizeof(gp.players[idx].name),
+                         "IA_%d", i+1);
+                gp.players[idx].meeple_color = tab_colors[idx];
+                gp.players[idx].meeples = NB_MEEPLES;
+                gp.players[idx].is_ai = true;
+                gp.players[idx].score = 0;
+            }
+            gp.num_players += nb_ia;
+        }
+    }
+
     return gp;
 }
-
 
 tile_t pick_tile(tiles_pack_t* tp) {
     return tp->tiles[--tp->remaining_tiles];
@@ -264,17 +299,26 @@ bool check_matching_zones(board_t* bd, tile_t t, position_t p) {
     return true;
 }
 
-void get_placement_tile(board_t* bd, frontiers_t* f, tile_t t, valid_positions_t* v) {
-    reset_valid_positions(v);
-    for (int i = 0; i < f->actual; i++) {
-        position_t p = f->positions[i];
-        tile_t tmp = t;
-        for (int r = 0; r < 4; r++) { 
-            if (check_matching_zones(bd, tmp, p))
-                add_to_valid_positions(v, p);
-            rotate_tile(&tmp, NINETY);
-        }
-    }
+
+void get_placement_tile(board_t* board,
+    frontiers_t* frontier,
+    tile_t tile,
+    degree_t rot,
+    valid_positions_t* v)
+{
+// tourne une copie selon rot
+tile_t tmp = tile;
+for (int r = 0; r < (int)rot; r++) {
+rotate_tile(&tmp, NINETY);
+}
+reset_valid_positions(v);
+// teste uniquement la rotation courante
+for (int i = 0; i < frontier->actual; i++) {
+position_t p = frontier->positions[i];
+if (check_matching_zones(board, tmp, p)) {
+add_to_valid_positions(v, p);
+}
+}
 }
 
 game_t init_game(int H, int W, const char* fn) {

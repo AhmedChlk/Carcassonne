@@ -5,7 +5,7 @@
 #include "player.h"
 #include "tile.h"
 
-//structure contenant toutes les variables d'une partie de jeu 
+// structure contenant toutes les variables d'une partie de jeu 
 typedef struct {
     board_t* board;
     tiles_pack_t tile_pack;
@@ -40,7 +40,6 @@ bool is_cell_empty(board_t* board, position_t pos);
 
 // Alloue et initialise une structure de frontière
 frontiers_t* allocate_frontier(void);
-
 
 // Libère la mémoire d'une frontière
 void free_frontier(frontiers_t** frontier);
@@ -81,8 +80,12 @@ void add_to_valid_positions(valid_positions_t* v, position_t pos);
 // Vérifie si une tuile peut être placée à pos selon zones
 bool check_matching_zones(board_t* board, tile_t tile, position_t pos);
 
-// Remplit valid_positions avec les emplacements possibles
-void get_placement_tile(board_t* b, frontiers_t* frontier, tile_t tile, valid_positions_t* valid_positions);
+// Remplit valid_positions avec les emplacements possibles pour la rotation donnée
+void get_placement_tile(board_t* board,
+                        frontiers_t* frontier,
+                        tile_t tile,
+                        degree_t rot,
+                        valid_positions_t* valid_positions);
 
 // Initialise une partie avec plateau et pack de tuiles
 game_t init_game(int board_height, int board_width, const char* tile_csv);
@@ -93,8 +96,8 @@ bool dfs_has_meeple(board_t* board, int x, int y, direction_t zone, zone_type_t 
 // Retourne pour une tuile les zones où on peut placer un meeple
 meeple_options_t get_placement_meeple(board_t* board, position_t pos);
 
-
 void score_completed_structures(game_t* G, position_t last_pos);
 
 void free_game(game_t* game);
-#endif
+
+#endif // ENGINE_H
