@@ -51,11 +51,16 @@ void add_to_frontier(frontiers_t* frontier, position_t pos);
 void remove_from_frontier(frontiers_t* frontier, position_t pos);
 void update_frontier_after_placement(board_t* board, frontiers_t* frontier, position_t pos);
 
+
 // === POSITIONS VALIDES POUR LES TUILES ===
 void reset_valid_positions(valid_positions_t* v);
 void add_to_valid_positions(valid_positions_t* v, position_t pos);
 
 // === CALCUL DES SCORES ===
 void score_completed_structures(game_t* G, position_t last_pos);
-
+/**
+ * \brief Scoring final : compte et attribue les points pour toutes les
+ *        structures incomplètes restantes (routes, villes, boucliers, abbayes).
+ */
+ void final_scoring(game_t *game);
 #endif // ENGINE_H

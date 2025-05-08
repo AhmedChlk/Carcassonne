@@ -9,13 +9,13 @@
 #define VIEW_WIDTH  10
 #define VIEW_HEIGHT 5
 
-// === CODES ANSI POUR LES COULEURS DES MEEPLES ===
-#define ANSI_RED    "\x1b[31m"
-#define ANSI_GREEN  "\x1b[32m"
-#define ANSI_YELLOW "\x1b[33m"
-#define ANSI_BLUE   "\x1b[34m"
-#define ANSI_WHITE  "\x1b[37m"
-#define ANSI_RESET  "\x1b[0m"
+
+typedef enum {
+    CTRL_NONE,
+    CTRL_PIOCHE,
+    CTRL_PLACE,
+    CTRL_MEEPLE
+} controls_state_t;
 
 // === UTILITAIRES DE COULEUR ===
 /** Renvoie le code ANSI de la couleur d’un meeple */

@@ -9,6 +9,8 @@
 
 // === VARIABLES INTERNES ===
 static bool *scored = NULL;
+static bool *vis_zone = NULL;  // pour marques DFS sur zones
+static bool *vis_tile = NULL;  // pour marques DFS sur tuiles
 
 void reset_scored(void) {
     free(scored);
@@ -599,4 +601,138 @@ void score_completed_structures(game_t* game, position_t last_pos) {
         free(mcount);
     }
 
+}
+
+void final_scoring(game_t *game) {
+    board_t *bd = game->board;
+    int H = bd->height, W = bd->width;
+    int total_z = H * W * 5;
+    int total_t = H * W;
+
+    // Allocation des marqueurs
+    vis_zone = calloc(total_z, sizeof *vis_zone);
+    vis_tile = calloc(total_t, sizeof *vis_tile);
+    if (!vis_zone || !vis_tile) { perror("calloc"); exit(EXIT_FAILURE); }
+
+    // 1) Routes et Villes incomplètes
+    const int DX[4] = {-1,0,1,0}, DY[4] = {0,1,0,-1};
+    const direction_t OPP[4] = {SOUTH, WEST, NORTH, EAST};
+
+    for (int x = 0; x < H; x++) {
+        for (int y = 0; y < W; y++) {
+            for (int side = 0; side < 4; side++) {
+                int zidx = (x*W + y)*5 + side;
+                zone_type_t type = bd->grid[x][y].zones[side];
+                if ((type != ROAD && type != CITY) || vis_zone[zidx]) 
+                    continue;
+                // BFS sur cette structure
+                bool closed = true;
+                int qh=0, qt=0;
+                int *q = malloc(total_z * sizeof *q);
+                int tile_count = 0, shield_count = 0;
+                int *mcount = calloc(game->players.num_players, sizeof(int));
+                // init
+                vis_zone[zidx] = true;
+                q[qt++] = zidx;
+                while (qh < qt) {
+                    int idx = q[qh++];
+                    int cz = idx % 5;
+                    int tid = idx / 5;
+                    int tx = tid / W, ty = tid % W;
+                    tile_t *t = &bd->grid[tx][ty];
+                    // première fois sur cette tuile ?
+                    if (!vis_tile[tid]) {
+                        vis_tile[tid] = true;
+                        tile_count++;
+                        // boucliers dans villes
+                        if (type == CITY) {
+                            for (int d2 = 0; d2 < 5; d2++)
+                                if (t->zones[d2] == SHIELD) shield_count++;
+                        }
+                    }
+                    // meeple
+                    if (t->has_meeple && (int) t->meeple_position == cz) {
+                        // compte pour joueur
+                        for (int pi=0; pi<game->players.num_players; pi++) {
+                            if (game->players.players[pi].meeple_color == t->meeple_color)
+                                mcount[pi]++;
+                        }
+                    }
+                    // intra-tile connexions
+                    for (int dz=0; dz<5; dz++) {
+                        int nidx = tid*5 + dz;
+                        if (vis_zone[nidx]) continue;
+                        if (t->zones[dz] == type &&
+                            (cz==CENTER || dz==CENTER || t->zones[CENTER]==type)) {
+                            vis_zone[nidx] = true;
+                            q[qt++] = nidx;
+                        }
+                    }
+                    // inter-tile connexions
+                    if (cz < 4) {
+                        int nx = tx + DX[cz], ny = ty + DY[cz];
+                        if (nx<0||nx>=H||ny<0||ny>=W ||
+                            bd->grid[nx][ny].zones[OPP[cz]] != type) {
+                            closed = false;
+                        } else {
+                            int nidx = (nx*W + ny)*5 + OPP[cz];
+                            if (!vis_zone[nidx]) {
+                                vis_zone[nidx] = true;
+                                q[qt++] = nidx;
+                            }
+                        }
+                    }
+                }
+                // si incomplète → score
+                if (!closed) {
+                    // détermine meilleur joueur
+                    int best = 0;
+                    for (int pi=1; pi<game->players.num_players; pi++)
+                        if (mcount[pi] > mcount[best]) best = pi;
+                    if (mcount[best] > 0) {
+                        int pts = tile_count;                // 1 pt/tile
+                        if (type == CITY) pts += shield_count*2; // +2 pts/bouclier
+                        game->players.players[best].score += pts;
+                    }
+                    // retire meeples
+                    for (int xi=0; xi<H; xi++)
+                        for (int yi=0; yi<W; yi++)
+                            if (bd->grid[xi][yi].has_meeple)
+                                remove_meeple(bd, &game->players, (position_t){xi,yi});
+                }
+                free(q);
+                free(mcount);
+            }
+        }
+    }
+
+    // 2) Abbayes incomplètes
+    for (int x = 0; x < H; x++) {
+        for (int y = 0; y < W; y++) {
+            tile_t *t = &bd->grid[x][y];
+            if (t->zones[CENTER] != ABBEY || !t->has_meeple) continue;
+            // compte cases manquantes autour
+            int missing = 0;
+            for (int dx=-1; dx<=1; dx++) {
+                for (int dy=-1; dy<=1; dy++) {
+                    if (dx==0 && dy==0) continue;
+                    int xx = x+dx, yy = y+dy;
+                    if (xx<0||xx>=H||yy<0||yy>=W ||
+                        !has_tile(bd,xx,yy)) missing++;
+                }
+            }
+            // attribut au joueur
+            for (int pi=0; pi<game->players.num_players; pi++){
+                if (game->players.players[pi].meeple_color == t->meeple_color) {
+                    game->players.players[pi].score += missing;
+                    break;
+                }
+            }
+            remove_meeple(bd, &game->players, (position_t){x,y});
+        }
+    }
+
+    // libération
+    free(vis_zone);
+    free(vis_tile);
 }

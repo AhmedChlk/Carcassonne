@@ -17,6 +17,9 @@ void gui_set_valid_positions(valid_positions_t* v);
 // === AFFICHAGE DES OPTIONS DE MEEPLE ===
 void gui_display_meeple_options(meeple_options_t opts, color_t player_color);
 
+// === AFFICHAGE DU NOMBRE DE TUILES RESTANTES ===
+void gui_set_remaining_tiles(int remaining);
+
 // === AFFICHAGE DU PLATEAU ===
 /**
  * \brief Affiche une fenêtre paginée 10×5 du plateau 144×144,

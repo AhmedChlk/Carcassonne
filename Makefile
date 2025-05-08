@@ -1,48 +1,79 @@
 SHELL := /bin/bash
 
-# Directories
-SRC       := src
-BUILD     := build
-BIN       := bin
-INC       := include
+# === Répertoires ===
+SRC   := src
+BUILD := build
+BIN   := bin
+INC   := include
 
-# Compiler and flags
-CC        := gcc
-CFLAGS := -Wall -Wextra \
-          -Wpedantic \
-          -I$(INC) -g
-LDFLAGS   := -lncurses
+# === Compilation ===
+CC      := gcc
+CFLAGS  := -Wall -Wextra -Wpedantic -I$(INC) -g
+LDFLAGS := -lncurses
 
-# Source files and objects
-SRCS      := $(wildcard $(SRC)/*.c)
-OBJS      := $(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(SRCS))
-TARGET    := $(BIN)/main
+# === Fichiers ===
+SRCS   := $(wildcard $(SRC)/*.c)
+OBJS   := $(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(SRCS))
+TARGET := $(BIN)/main
 
-.PHONY: all clean run generate_code
+# === Couleurs ===
+RESET  := \033[0m
+BOLD   := \033[1m
+RED    := \033[31m
+GREEN  := \033[32m
+YELLOW := \033[33m
+BLUE   := \033[34m
+CYAN   := \033[36m
 
-all: $(TARGET)
+.PHONY: all clean run generate_code banner
+
+# === Effet progressif ===
+define progress
+	@sleep 0.2 && echo -n "." && sleep 0.2 && echo -n "." && sleep 0.2 && echo "."
+endef
+
+# === Build principal ===
+all: banner $(TARGET)
+	@$(call progress)
+	@echo -e "$(GREEN)✅ Build terminé avec succès.$(RESET)\n"
 
 $(TARGET): $(OBJS) | $(BIN)
-	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
+	@echo -e "$(CYAN)\n🔗 ===== Linking Objects =====$(RESET)"
+	@$(call progress)
+	@$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
+	@echo -e "$(YELLOW)------------------------------------------------------$(RESET)"
 
 $(BUILD)/%.o: $(SRC)/%.c | $(BUILD)
-	$(CC) $(CFLAGS) -c $< -o $@
+	@echo -e "$(BLUE)🔨 Compilation de $<...$(RESET)"
+	@$(call progress)
+	@$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD) $(BIN):
-	mkdir -p $@
+	@mkdir -p $@
 
-# cleaning the compiled filess
+# === Nettoyage ===
 clean:
-	rm -rf $(BUILD) $(BIN) code.txt
+	@echo -e "$(RED)\n🧹 Nettoyage du projet...$(RESET)"
+	@$(call progress)
+	@rm -rf $(BUILD) $(BIN) code.txt
+	@$(call progress)
+	@echo -e "$(YELLOW)🧼 Fichiers supprimés avec succès.$(RESET)"
+	@echo -e "$(YELLOW)------------------------------------------------------$(RESET)"
 
-# run the program
+# === Exécution ===
 run: all
-	$(TARGET)
+	@echo -e "$(GREEN)\n🚀 Lancement de l'application :$(RESET)"
+	@$(call progress)
+	@$(TARGET)
+	@echo -e "$(YELLOW)------------------------------------------------------$(RESET)"
 
-# Generate a code snapshot
+# === Génération snapshot ===
 generate_code:
+	@echo -e "$(CYAN)\n📄 Génération de 'code.txt'...$(RESET)"
+	@$(call progress)
 	@echo "===== PROJECT TREE =====" > code.txt
 	@tree -I '.*' >> code.txt
+	@$(call progress)
 	@echo -e "\n===== FILE CONTENTS =====" >> code.txt
 	@find . -type f \
 		! -path "./.*" \
@@ -52,3 +83,17 @@ generate_code:
 		cat "$$file" >> code.txt; \
 		echo "" >> code.txt; \
 	done
+	@$(call progress)
+	@echo -e "$(GREEN)📚 'code.txt' généré avec succès.$(RESET)"
+	@echo -e "$(YELLOW)------------------------------------------------------$(RESET)"
+# === Bannière ===
+banner:
+	@echo -e "$(BOLD)$(BLUE)"
+	@echo "  ____    _    ____   ____    _    ____ ____   ___  _   _ _   _ _____"
+	@echo " / ___|  / \  |  _ \ / ___|  / \  / ___/ ___| / _ \| \ | | \ | | ____|"
+	@echo "| |     / _ \ | |_) | |     / _ \ \___ \___ \| | | |  \| |  \| |  _|"
+	@echo "| |___ / ___ \|  _ <| |___ / ___ \ ___) |__) | |_| | |\  | |\  | |___"
+	@echo " \____/_/   \_\_| \_\\____/_/   \_\____/____/ \___/|_| \_|_| \_|_____|"
+	@$(call progress)
+	@echo -e "\n        Bienvenue dans Carcassonne !$(RESET)"
+	@echo -e "$(YELLOW)======================================================$(RESET)\n"
