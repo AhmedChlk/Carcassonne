@@ -7,11 +7,35 @@
 #include "engine.h"
 #include "player.h"
 
+// === VARIABLES INTERNES ===
 static bool *scored = NULL;
 
 void reset_scored(void) {
     free(scored);
     scored = NULL;
+}
+
+// === INITIALISATION & LIBÉRATION ===
+game_t init_game(int H, int W, const char* fn) {
+    game_t G;
+    G.board           = initialize_board(H, W);
+    G.frontier        = allocate_frontier();
+    G.valid_positions = allocate_valid_positions();
+    G.tile_pack       = initialize_tile_pack(fn);
+    tile_t st         = pick_tile(&G.tile_pack);
+    position_t c      = { H/2, W/2 };
+    place_tile(G.board, G.frontier, st, c);
+    shuffle_tile_pack(&G.tile_pack);
+    G.players         = create_players();
+    return G;
+}
+
+void free_game(game_t* game) {
+    free_frontier(&game->frontier);
+    free_valid_positions(&game->valid_positions);
+    free_board(game->board);
+    free(game->players.players);
+    reset_scored();
 }
 
 board_t* initialize_board(int h, int w) {
@@ -43,47 +67,6 @@ void free_board(board_t* bd) {
         free(bd->grid[i]);
     free(bd->grid);
     free(bd);
-}
-
-tiles_pack_t initialize_tile_pack(const char* fn) {
-    char path[256] = "data/";
-    strcat(path, fn);
-    FILE* f = fopen(path, "r");
-    if (!f) { fprintf(stderr, "Erreur open %s\n", path); exit(EXIT_FAILURE); }
-    tiles_pack_t tp;
-    tp.remaining_tiles = NB_TILES;
-    char buf[1024];
-    int zi, ti = 0;
-    while (fgets(buf, sizeof buf, f)) {
-        zi = 0;
-        char* tok = strtok(buf, ",\n");
-        while (tok) {
-            if      (!strcmp(tok, "blason"))  tp.tiles[ti].zones[zi++] = SHIELD;
-            else if (!strcmp(tok, "route"))   tp.tiles[ti].zones[zi++] = ROAD;
-            else if (!strcmp(tok, "pre"))     tp.tiles[ti].zones[zi++] = FIELD;
-            else if (!strcmp(tok, "village")) tp.tiles[ti].zones[zi++] = VILLAGE;
-            else if (!strcmp(tok, "ville"))   tp.tiles[ti].zones[zi++] = CITY;
-            else if (!strcmp(tok, "abbaye"))  tp.tiles[ti].zones[zi++] = ABBEY;
-            tok = strtok(NULL, ",\n");
-        }
-        tp.tiles[ti].has_meeple = false;
-        tp.tiles[ti].meeple_position = NO_DIRECTION;
-        tp.tiles[ti].meeple_color = NO_COLOR;
-        ti++;
-    }
-    fclose(f);
-    return tp;
-}
-
-
-void shuffle_tile_pack(tiles_pack_t* tp) {
-    for (int i = 0; i < NB_TILES; i++) {
-        int a = rand() % NB_TILES, b;
-        do { b = rand() % NB_TILES; } while (a == b);
-        tile_t tmp = tp->tiles[a];
-        tp->tiles[a] = tp->tiles[b];
-        tp->tiles[b] = tmp;
-    }
 }
 
 game_players_t create_players(){
@@ -151,6 +134,112 @@ game_players_t create_players(){
     return gp;
 }
 
+tiles_pack_t initialize_tile_pack(const char* fn) {
+    char path[256] = "data/";
+    strcat(path, fn);
+    FILE* f = fopen(path, "r");
+    if (!f) { fprintf(stderr, "Erreur open %s\n", path); exit(EXIT_FAILURE); }
+    tiles_pack_t tp;
+    tp.remaining_tiles = NB_TILES;
+    char buf[1024];
+    int zi, ti = 0;
+    while (fgets(buf, sizeof buf, f)) {
+        zi = 0;
+        char* tok = strtok(buf, ",\n");
+        while (tok) {
+            if      (!strcmp(tok, "blason"))  tp.tiles[ti].zones[zi++] = SHIELD;
+            else if (!strcmp(tok, "route"))   tp.tiles[ti].zones[zi++] = ROAD;
+            else if (!strcmp(tok, "pre"))     tp.tiles[ti].zones[zi++] = FIELD;
+            else if (!strcmp(tok, "village")) tp.tiles[ti].zones[zi++] = VILLAGE;
+            else if (!strcmp(tok, "ville"))   tp.tiles[ti].zones[zi++] = CITY;
+            else if (!strcmp(tok, "abbaye"))  tp.tiles[ti].zones[zi++] = ABBEY;
+            tok = strtok(NULL, ",\n");
+        }
+        tp.tiles[ti].has_meeple = false;
+        tp.tiles[ti].meeple_position = NO_DIRECTION;
+        tp.tiles[ti].meeple_color = NO_COLOR;
+        ti++;
+    }
+    fclose(f);
+    return tp;
+}
+
+frontiers_t* allocate_frontier(void) {
+    frontiers_t* f = malloc(sizeof *f);
+    f->actual   = 0;
+    f->capacity = NB_TILES;
+    f->positions = malloc(f->capacity * sizeof(position_t));
+    return f;
+}
+
+void free_frontier(frontiers_t** f) {
+    free((*f)->positions);
+    free(*f);
+    *f = NULL;
+}
+
+valid_positions_t* allocate_valid_positions(void) {
+    valid_positions_t* v = malloc(sizeof *v);
+    v->actual   = 0;
+    v->capacity = NB_TILES;
+    v->valid_positions = malloc(v->capacity * sizeof(position_t));
+    return v;
+}
+
+void free_valid_positions(valid_positions_t** v) {
+    free((*v)->valid_positions);
+    free(*v);
+    *v = NULL;
+}
+
+// === UTILITAIRES ===
+bool check_matching_zones(board_t* bd, tile_t t, position_t p) {
+    position_t dirs[4] = {{-1,0},{0,1},{1,0},{0,-1}};
+    direction_t opp[4] = { SOUTH, WEST, NORTH, EAST };
+    for (int k = 0; k < 4; k++) {
+        int nx = p.x + dirs[k].x;
+        int ny = p.y + dirs[k].y;
+        if (nx>=0 && nx<bd->height && ny>=0 && ny<bd->width && bd->grid[nx][ny].zones[opp[k]]!=NONE) {
+            zone_type_t z = bd->grid[nx][ny].zones[opp[k]];
+            if (t.zones[k]!=z && !((t.zones[k]==SHIELD&&z==CITY)||(t.zones[k]==CITY&&z==SHIELD)))
+                return false;
+        }
+    }
+    return true;
+}
+
+bool is_cell_empty(board_t* bd, position_t pos) {
+    for (int i = 0; i < 5; i++)
+        if (bd->grid[pos.x][pos.y].zones[i] != NONE)
+            return false;
+    return true;
+}
+
+bool feature_matches(zone_type_t a, zone_type_t b) {
+    return a==b || (a==CITY && b==SHIELD) || (a==SHIELD && b==CITY);
+}
+
+bool has_tile(board_t* bd, int x, int y) {
+    for (int d = 0; d < 5; d++) {
+        if (bd->grid[x][y].zones[d] != NONE)
+            return true;
+    }
+    return false;
+}
+
+// === MANIPULATION DES TUILES ===
+
+void shuffle_tile_pack(tiles_pack_t* tp) {
+    for (int i = 0; i < NB_TILES; i++) {
+        int a = rand() % NB_TILES, b;
+        do { b = rand() % NB_TILES; } while (a == b);
+        tile_t tmp = tp->tiles[a];
+        tp->tiles[a] = tp->tiles[b];
+        tp->tiles[b] = tmp;
+    }
+}
+
+
 tile_t pick_tile(tiles_pack_t* tp) {
     return tp->tiles[--tp->remaining_tiles];
 }
@@ -181,57 +270,36 @@ void rotate_tile(tile_t* t, degree_t deg) {
     }
 }
 
-
-bool is_cell_empty(board_t* bd, position_t pos) {
-    for (int i = 0; i < 5; i++)
-        if (bd->grid[pos.x][pos.y].zones[i] != NONE)
-            return false;
-    return true;
+void place_tile(board_t* bd, frontiers_t* f, tile_t t, position_t p) {
+    bd->grid[p.x][p.y] = t;
+    if(f) {
+        update_frontier_after_placement(bd, f, p);
+        if(is_in_frontier(f, p)) remove_from_frontier(f, p);
+    }
 }
 
-bool is_in_frontier(frontiers_t* f, position_t p) {
-    for (int i = 0; i < f->actual; i++)
-        if (f->positions[i].x == p.x && f->positions[i].y == p.y)
-            return true;
-    return false;
-}
+void get_placement_tile(board_t* board,frontiers_t* frontier,tile_t tile,degree_t rot,valid_positions_t* v)
+{
+    // Crée une copie de la tuile et applique la rotation souhaitée
+    tile_t tmp = tile;
+    for (int r = 0; r < (int)rot; r++) {
+        rotate_tile(&tmp, NINETY);
+    }
 
-frontiers_t* allocate_frontier(void) {
-    frontiers_t* f = malloc(sizeof *f);
-    f->actual   = 0;
-    f->capacity = NB_TILES;
-    f->positions = malloc(f->capacity * sizeof(position_t));
-    return f;
-}
+    // Réinitialise les positions valides
+    reset_valid_positions(v);
 
-void free_frontier(frontiers_t** f) {
-    free((*f)->positions);
-    free(*f);
-    *f = NULL;
-}
-
-void add_to_frontier(frontiers_t* f, position_t p) {
-    if (!is_in_frontier(f, p))
-        f->positions[f->actual++] = p;
-}
-
-void remove_from_frontier(frontiers_t* f, position_t p) {
-    for (int i = 0; i < f->actual; i++) {
-        if (f->positions[i].x == p.x && f->positions[i].y == p.y) {
-            f->positions[i] = f->positions[--f->actual];
-            return;
+    // Vérifie chaque position de la frontière pour voir si la tuile peut être placée
+    for (int i = 0; i < frontier->actual; i++) {
+        position_t p = frontier->positions[i];
+        if (check_matching_zones(board, tmp, p)) {
+            add_to_valid_positions(v, p);
         }
     }
 }
 
-void update_frontier_after_placement(board_t* bd, frontiers_t* f, position_t p) {
-    position_t dirs[4] = {{-1,0},{0,1},{1,0},{0,-1}};
-    for (int k = 0; k < 4; k++) {
-        position_t q = { p.x + dirs[k].x, p.y + dirs[k].y };
-        if (q.x >= 0 && q.x < bd->height && q.y >= 0 && q.y < bd->width && is_cell_empty(bd, q))
-            add_to_frontier(f, q);
-    }
-}
+
+// === MEEPLES ===
 
 void place_meeple(board_t* bd, game_players_t* gp, direction_t d, position_t p, color_t c) {
     bd->grid[p.x][p.y].has_meeple     = true;
@@ -258,86 +326,6 @@ void remove_meeple(board_t* bd, game_players_t* gp, position_t p) {
     }
 }
 
-valid_positions_t* allocate_valid_positions(void) {
-    valid_positions_t* v = malloc(sizeof *v);
-    v->actual   = 0;
-    v->capacity = NB_TILES;
-    v->valid_positions = malloc(v->capacity * sizeof(position_t));
-    return v;
-}
-
-void free_valid_positions(valid_positions_t** v) {
-    free((*v)->valid_positions);
-    free(*v);
-    *v = NULL;
-}
-
-void reset_valid_positions(valid_positions_t* v) {
-    v->actual = 0;
-}
-
-void add_to_valid_positions(valid_positions_t* v, position_t p) {
-    if (v->actual == v->capacity) {
-        v->capacity *= 2;
-        v->valid_positions = realloc(v->valid_positions, v->capacity * sizeof(position_t));
-    }
-    v->valid_positions[v->actual++] = p;
-}
-
-bool check_matching_zones(board_t* bd, tile_t t, position_t p) {
-    position_t dirs[4] = {{-1,0},{0,1},{1,0},{0,-1}};
-    direction_t opp[4] = { SOUTH, WEST, NORTH, EAST };
-    for (int k = 0; k < 4; k++) {
-        int nx = p.x + dirs[k].x;
-        int ny = p.y + dirs[k].y;
-        if (nx>=0 && nx<bd->height && ny>=0 && ny<bd->width && bd->grid[nx][ny].zones[opp[k]]!=NONE) {
-            zone_type_t z = bd->grid[nx][ny].zones[opp[k]];
-            if (t.zones[k]!=z && !((t.zones[k]==SHIELD&&z==CITY)||(t.zones[k]==CITY&&z==SHIELD)))
-                return false;
-        }
-    }
-    return true;
-}
-
-
-void get_placement_tile(board_t* board,
-    frontiers_t* frontier,
-    tile_t tile,
-    degree_t rot,
-    valid_positions_t* v)
-{
-// tourne une copie selon rot
-tile_t tmp = tile;
-for (int r = 0; r < (int)rot; r++) {
-rotate_tile(&tmp, NINETY);
-}
-reset_valid_positions(v);
-// teste uniquement la rotation courante
-for (int i = 0; i < frontier->actual; i++) {
-position_t p = frontier->positions[i];
-if (check_matching_zones(board, tmp, p)) {
-add_to_valid_positions(v, p);
-}
-}
-}
-
-game_t init_game(int H, int W, const char* fn) {
-    game_t G;
-    G.board           = initialize_board(H, W);
-    G.frontier        = allocate_frontier();
-    G.valid_positions = allocate_valid_positions();
-    G.tile_pack       = initialize_tile_pack(fn);
-    tile_t st         = pick_tile(&G.tile_pack);
-    position_t c      = { H/2, W/2 };
-    place_tile(G.board, G.frontier, st, c);
-    shuffle_tile_pack(&G.tile_pack);
-    G.players         = create_players();
-    return G;
-}
-
-bool feature_matches(zone_type_t a, zone_type_t b) {
-    return a==b || (a==CITY && b==SHIELD) || (a==SHIELD && b==CITY);
-}
 
 bool dfs_has_meeple(board_t* bd,int x,int y,direction_t z,zone_type_t tgt,bool* vs) {
     int idx = (x*bd->width + y)*5 + z;
@@ -384,24 +372,56 @@ meeple_options_t get_placement_meeple(board_t* bd, position_t p) {
     return opt;
 }
 
-void place_tile(board_t* bd, frontiers_t* f, tile_t t, position_t p) {
-    bd->grid[p.x][p.y] = t;
-    if(f) {
-        update_frontier_after_placement(bd, f, p);
-        if(is_in_frontier(f, p)) remove_from_frontier(f, p);
-    }
-}
 
+// === GESTION DES FRONTIÈRES ===
 
-
-static bool has_tile(board_t* bd, int x, int y) {
-    for (int d = 0; d < 5; d++) {
-        if (bd->grid[x][y].zones[d] != NONE)
+bool is_in_frontier(frontiers_t* f, position_t p) {
+    for (int i = 0; i < f->actual; i++)
+        if (f->positions[i].x == p.x && f->positions[i].y == p.y)
             return true;
-    }
     return false;
 }
 
+void add_to_frontier(frontiers_t* f, position_t p) {
+    if (!is_in_frontier(f, p))
+        f->positions[f->actual++] = p;
+}
+
+void remove_from_frontier(frontiers_t* f, position_t p) {
+    for (int i = 0; i < f->actual; i++) {
+        if (f->positions[i].x == p.x && f->positions[i].y == p.y) {
+            f->positions[i] = f->positions[--f->actual];
+            return;
+        }
+    }
+}
+
+void update_frontier_after_placement(board_t* bd, frontiers_t* f, position_t p) {
+    position_t dirs[4] = {{-1,0},{0,1},{1,0},{0,-1}};
+    for (int k = 0; k < 4; k++) {
+        position_t q = { p.x + dirs[k].x, p.y + dirs[k].y };
+        if (q.x >= 0 && q.x < bd->height && q.y >= 0 && q.y < bd->width && is_cell_empty(bd, q))
+            add_to_frontier(f, q);
+    }
+}
+
+
+
+// === POSITIONS VALIDES POUR LES TUILES ===
+
+void reset_valid_positions(valid_positions_t* v) {
+    v->actual = 0;
+}
+
+void add_to_valid_positions(valid_positions_t* v, position_t p) {
+    if (v->actual == v->capacity) {
+        v->capacity *= 2;
+        v->valid_positions = realloc(v->valid_positions, v->capacity * sizeof(position_t));
+    }
+    v->valid_positions[v->actual++] = p;
+}
+
+// === CALCUL DES SCORES ===
 void score_completed_structures(game_t* game, position_t last_pos) {
     board_t* bd = game->board;
     game_players_t* gp = &game->players;
@@ -579,12 +599,4 @@ void score_completed_structures(game_t* game, position_t last_pos) {
         free(mcount);
     }
 
-}
-
-void free_game(game_t* game) {
-    free_frontier(&game->frontier);
-    free_valid_positions(&game->valid_positions);
-    free_board(game->board);
-    free(game->players.players);
-    reset_scored();
 }

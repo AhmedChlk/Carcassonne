@@ -2,22 +2,27 @@
 #include "engine.h"
 #include <stdio.h>
 
+// === CONSTANTES ANSI POUR L'AFFICHAGE COULEUR EN CONSOLE ===
 #define ZC_RESET   "\033[0m"
 #define BG_GREEN   "\033[42m"
 #define REV_VIDEO  "\033[7m"
 
+// === POINTEUR GLOBAL POUR LES POSITIONS VALIDES ===
+
 static valid_positions_t* g_valid = NULL;
 
-void gui_set_valid_positions(valid_positions_t* v) {
-    g_valid = v;
-}
+// === AFFICHAGE DES TUILES ET ZONES ===
+static const char* zone_color(zone_type_t z) {
+    switch (z) {
 
-void gui_show_current_tile(tile_t tile, degree_t rotation) {
-    tile_t tmp = tile;
-    for (int r = 0; r < (int)rotation; r++)
-        rotate_tile(&tmp, NINETY);
-    printf("Tuile courante (rotation %d°) :\n", rotation * 90);
-    print_tile(tmp);
+        case CITY:    return "\033[0;31m";
+        case ROAD:    return "\033[0;33m";
+        case FIELD:   return "\033[0;32m";
+        case SHIELD:  return "\033[0;35m";
+        case VILLAGE: return "\033[0;36m";
+        case ABBEY:   return "\033[0;37m";
+        default:      return ZC_RESET;
+    }
 }
 
 char print_zone(zone_type_t z) {
@@ -29,18 +34,6 @@ char print_zone(zone_type_t z) {
         case VILLAGE: return 'V';
         case ABBEY:   return 'A';
         default:      return ' ';
-    }
-}
-
-static const char* zone_color(zone_type_t z) {
-    switch (z) {
-        case CITY:    return "\033[0;31m";
-        case ROAD:    return "\033[0;33m";
-        case FIELD:   return "\033[0;32m";
-        case SHIELD:  return "\033[0;35m";
-        case VILLAGE: return "\033[0;36m";
-        case ABBEY:   return "\033[0;37m";
-        default:      return ZC_RESET;
     }
 }
 
@@ -57,6 +50,16 @@ void print_tile(tile_t t) {
     printf("\033[1m\033[0;37m└───┘\n" ZC_RESET);
 }
 
+void gui_show_current_tile(tile_t tile, degree_t rotation) {
+    tile_t tmp = tile;
+    for (int r = 0; r < (int)rotation; r++)
+        rotate_tile(&tmp, NINETY);
+    printf("Tuile courante (rotation %d°) :\n", rotation * 90);
+    print_tile(tmp);
+}
+
+// === AFFICHAGE DES POSITIONS VALIDES ===
+
 void gui_display_positions(valid_positions_t* v) {
     printf("\n\033[0;36m╭─ Positions valides ─────────────────╮\033[0m\n");
     for (int i = 0; i < v->actual; i++) {
@@ -69,6 +72,12 @@ void gui_display_positions(valid_positions_t* v) {
     if (v->actual % 2) printf("\n");
     printf("\033[0;36m╰──────────────────────────────────────╯\033[0m\n\n");
 }
+
+void gui_set_valid_positions(valid_positions_t* v) {
+    g_valid = v;
+}
+
+// === AFFICHAGE DES OPTIONS DE MEEPLE ===
 
 void gui_display_meeple_options(meeple_options_t opts, color_t player_color) {
     (void)player_color;
@@ -87,6 +96,8 @@ void gui_display_meeple_options(meeple_options_t opts, color_t player_color) {
     if (5 % 2) printf("\n");
     printf("\033[0;35m╰──────────────────────────────────────╯\033[0m\n\n");
 }
+
+// === AFFICHAGE DU PLATEAU ===
 
 void print_board(board_t *board,
                  int offsetX, int offsetY,

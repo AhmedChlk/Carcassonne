@@ -4,19 +4,19 @@
 #include <stdbool.h>
 #include "tile.h"
 
-// Nombre de meeples par joueur
-#define NB_MEEPLES 7  
+// === CONSTANTES ===
+#define NB_MEEPLES 7  // Nombre de meeples par joueur
 
-// Structure d'un joueur humain ou IA
+// === STRUCTURE D'UN JOUEUR ===
 typedef struct player_t {
     char    name[50];
     int     meeples;
     color_t meeple_color;
     bool    is_ai;
-    int     score;       // ajout du score
+    int     score;
 } player_t;
 
-// Liste des joueurs et leur nombre
+// === STRUCTURE DES JOUEURS DU JEU ===
 typedef struct {
     player_t* players;
     int       num_players;

@@ -3,10 +3,11 @@
 
 #include "tile.h"
 
-// Structure du plateau de jeu
+// === STRUCTURE DU PLATEAU DE JEU ===
 typedef struct {
-    int width, height;    // Dimensions
-    tile_t** grid;        // Grille 2D de pointeurs vers les tuiles
+    int width;          
+    int height;          
+    tile_t** grid;       
 } board_t;
 
-#endif
+#endif // BOARD_H
