@@ -9,7 +9,7 @@ INC   := include
 # === Compilation ===
 CC      := gcc
 CFLAGS  := -Wall -Wextra -Wpedantic -I$(INC) -g
-LDFLAGS := -lncurses
+LDFLAGS := 
 
 # === Fichiers ===
 SRCS   := $(wildcard $(SRC)/*.c)
