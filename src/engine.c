@@ -7,13 +7,16 @@
 #include "engine.h"
 #include "player.h"
 
+/* =========== VARIABLES GLOBALES =========== */
 static bool *scored = NULL;
 
+/* =========== GESTION MÉMOIRE SCORING =========== */
 static void reset_scored(void) {
     free(scored);
     scored = NULL;
 }
 
+/* =========== CRÉATION ET DESTRUCTION DU PLATEAU =========== */
 board_t* create_board(int height, int width) {
     reset_scored();
     board_t* board = malloc(sizeof *board);
@@ -55,6 +58,7 @@ void destroy_board(board_t* board) {
     free(board);
 }
 
+/* =========== GESTION DES TUILES =========== */
 tiles_pack_t initialize_tile_pack(const char* filename) {
     FILE* file = fopen(filename, "r");
     if (!file) {
@@ -88,7 +92,6 @@ tiles_pack_t initialize_tile_pack(const char* filename) {
     return pack;
 }
 
-//Fisher-Yates shuffle
 void shuffle_tile_pack(tiles_pack_t* pack) {
     for (int i = pack->remaining_tiles - 1; i > 0; i--) {
         int j = rand() % (i + 1);
@@ -96,87 +99,6 @@ void shuffle_tile_pack(tiles_pack_t* pack) {
         pack->tiles[i] = pack->tiles[j];
         pack->tiles[j] = tmp;
     }
-}
-game_players_t create_players() {
-    game_players_t gp = {0};
-    color_t colors[5] = {RED, BLUE, GREEN, YELLOW, WHITE};
-    int human_count = 0, ai_count = 0;
-
-    // === Saisie nombre de joueurs humains ===
-    do {
-        printf("Combien de joueurs humains ? (1 à 5) : ");
-        if (scanf("%d", &human_count) != 1 || human_count < 1 || human_count > 5) {
-            printf("❌ Saisie invalide. Veuillez entrer un nombre entre 1 et 5.\n");
-            while (getchar() != '\n'); // vider buffer
-            human_count = 0;
-        } else {
-            while (getchar() != '\n'); // vider buffer
-        }
-    } while (human_count == 0);
-
-    // === Gestion spéciale si un seul joueur ===
-    if (human_count == 1) {
-        printf("ℹ️  Vous êtes seul(e), au moins une IA est requise pour jouer.\n");
-        do {
-            printf("Combien d'IA souhaitez-vous ajouter ? (1 à 4) : ");
-            if (scanf("%d", &ai_count) != 1 || ai_count < 1 || ai_count > 4) {
-                printf("❌ Saisie invalide. Entrez un nombre entre 1 et 4.\n");
-                while (getchar() != '\n');
-                ai_count = 0;
-            } else {
-                while (getchar() != '\n');
-            }
-        } while (ai_count == 0);
-    }
-    // === Saisie IA facultative si joueurs humains < 5 ===
-    else if (human_count < 5) {
-        char answer = '\0';
-        printf("Souhaitez-vous inclure des IA ? (y/n) : ");
-        scanf(" %c", &answer);
-        while (getchar() != '\n');
-
-        if (answer == 'y' || answer == 'Y') {
-            do {
-                printf("Combien d'IA voulez-vous ajouter ? (0 à %d) : ", 5 - human_count);
-                if (scanf("%d", &ai_count) != 1 || ai_count < 0 || ai_count > 5 - human_count) {
-                    printf("❌ Nombre invalide. Entrez une valeur entre 0 et %d.\n", 5 - human_count);
-                    while (getchar() != '\n');
-                    ai_count = -1;
-                } else {
-                    while (getchar() != '\n');
-                }
-            } while (ai_count < 0);
-        }
-    }
-
-    int total_players = human_count + ai_count;
-    gp.players = malloc(total_players * sizeof(player_t));
-    gp.num_players = total_players;
-
-    // === Création des joueurs humains ===
-    for (int i = 0; i < human_count; i++) {
-        printf("Entrez le nom du joueur %d : ", i + 1);
-        fgets(gp.players[i].name, sizeof(gp.players[i].name), stdin);
-        gp.players[i].name[strcspn(gp.players[i].name, "\n")] = '\0';
-
-        gp.players[i].meeple_color = colors[i];
-        gp.players[i].meeples = NB_MEEPLES;
-        gp.players[i].is_ai = false;
-        gp.players[i].score = 0;
-    }
-
-    // === Création des IA ===
-    for (int i = 0; i < ai_count; i++) {
-        int idx = human_count + i;
-        snprintf(gp.players[idx].name, sizeof(gp.players[idx].name), "IA_%d", i + 1);
-
-        gp.players[idx].meeple_color = colors[idx];
-        gp.players[idx].meeples = NB_MEEPLES;
-        gp.players[idx].is_ai = true;
-        gp.players[idx].score = 0;
-    }
-
-    return gp;
 }
 
 tile_t pick_tile(tiles_pack_t* tp) {
@@ -216,73 +138,83 @@ bool is_cell_empty(board_t* board, position_t pos) {
     return true;
 }
 
-/* === FRONTIERES ===  */
-    frontiers_t* create_frontier(void) {
-        frontiers_t* frontier = malloc(sizeof *frontier);
-        if (!frontier) {
-            fprintf(stderr, "Erreur : allocation de frontiers_t échouée.\n");
-            exit(EXIT_FAILURE);
-        }
-        frontier->size = 0;
-        frontier->capacity = NB_TILES;
-        frontier->positions = malloc(frontier->capacity * sizeof(position_t));
-        if (!frontier->positions) {
-            fprintf(stderr, "Erreur : allocation du tableau de positions échouée.\n");
-            free(frontier);
-            exit(EXIT_FAILURE);
-        }
-        return frontier;
-    }
+/* =========== GESTION DES JOUEURS =========== */
+game_players_t create_players() {
+    game_players_t gp = {0};
+    color_t colors[5] = {RED, BLUE, GREEN, YELLOW, WHITE};
+    int human_count = 0, ai_count = 0;
 
-    void free_frontier(frontiers_t** frontier_ptr) {
-        if (!frontier_ptr || !*frontier_ptr) return;
-        free((*frontier_ptr)->positions);
-        free(*frontier_ptr);
-        *frontier_ptr = NULL;
-    }
-
-    bool is_in_frontier(frontiers_t* frontier, position_t pos) {
-        for (int i = 0; i < frontier->size; i++) {
-            if (frontier->positions[i].x == pos.x && frontier->positions[i].y == pos.y)
-                return true;
+    // Saisie des joueurs humains
+    do {
+        printf("Combien de joueurs humains ? (1 à 5) : ");
+        if (scanf("%d", &human_count) != 1 || human_count < 1 || human_count > 5) {
+            printf("❌ Saisie invalide. Veuillez entrer un nombre entre 1 et 5.\n");
+            while (getchar() != '\n');
+            human_count = 0;
+        } else {
+            while (getchar() != '\n');
         }
-        return false;
-    }
+    } while (human_count == 0);
 
-    void add_to_frontier(frontiers_t* frontier, position_t pos) {
-        if (!is_in_frontier(frontier, pos)) {
-            if (frontier->size < frontier->capacity) {
-                frontier->positions[frontier->size++] = pos;
+    if (human_count == 1) {
+        printf("ℹ️  Vous êtes seul(e), au moins une IA est requise pour jouer.\n");
+        do {
+            printf("Combien d'IA souhaitez-vous ajouter ? (1 à 4) : ");
+            if (scanf("%d", &ai_count) != 1 || ai_count < 1 || ai_count > 4) {
+                printf("❌ Saisie invalide. Entrez un nombre entre 1 et 4.\n");
+                while (getchar() != '\n');
+                ai_count = 0;
             } else {
-                fprintf(stderr, "Erreur : frontière pleine, impossible d'ajouter (%d, %d)\n", pos.x, pos.y);
+                while (getchar() != '\n');
             }
+        } while (ai_count == 0);
+    } else if (human_count < 5) {
+        char answer = '\0';
+        printf("Souhaitez-vous inclure des IA ? (y/n) : ");
+        scanf(" %c", &answer);
+        while (getchar() != '\n');
+
+        if (answer == 'y' || answer == 'Y') {
+            do {
+                printf("Combien d'IA voulez-vous ajouter ? (0 à %d) : ", 5 - human_count);
+                if (scanf("%d", &ai_count) != 1 || ai_count < 0 || ai_count > 5 - human_count) {
+                    printf("❌ Nombre invalide. Entrez une valeur entre 0 et %d.\n", 5 - human_count);
+                    while (getchar() != '\n');
+                    ai_count = -1;
+                } else {
+                    while (getchar() != '\n');
+                }
+            } while (ai_count < 0);
         }
     }
 
-    void remove_from_frontier(frontiers_t* frontier, position_t pos) {
-        for (int i = 0; i < frontier->size; i++) {
-            if (frontier->positions[i].x == pos.x && frontier->positions[i].y == pos.y) {
-                frontier->positions[i] = frontier->positions[--frontier->size];
-                return;
-            }
-        }
+    int total_players = human_count + ai_count;
+    gp.players = malloc(total_players * sizeof(player_t));
+    gp.num_players = total_players;
+
+    for (int i = 0; i < human_count; i++) {
+        printf("Entrez le nom du joueur %d : ", i + 1);
+        fgets(gp.players[i].name, sizeof(gp.players[i].name), stdin);
+        gp.players[i].name[strcspn(gp.players[i].name, "\n")] = '\0';
+        gp.players[i].meeple_color = colors[i];
+        gp.players[i].meeples = NB_MEEPLES;
+        gp.players[i].is_ai = false;
+        gp.players[i].score = 0;
     }
 
-    void update_frontier_after_placement(board_t* board, frontiers_t* frontier, position_t pos) {
-        position_t directions[4] = { {-1,0}, {0,1}, {1,0}, {0,-1} };
-        for (int i = 0; i < 4; i++) {
-            position_t neighbor = { pos.x + directions[i].x, pos.y + directions[i].y };
-            if (neighbor.x >= 0 && neighbor.x < board->height &&
-                neighbor.y >= 0 && neighbor.y < board->width &&
-                is_cell_empty(board, neighbor)) {
-                add_to_frontier(frontier, neighbor);
-            }
-        }
+    for (int i = 0; i < ai_count; i++) {
+        int idx = human_count + i;
+        snprintf(gp.players[idx].name, sizeof(gp.players[idx].name), "IA_%d", i + 1);
+        gp.players[idx].meeple_color = colors[idx];
+        gp.players[idx].meeples = NB_MEEPLES;
+        gp.players[idx].is_ai = true;
+        gp.players[idx].score = 0;
     }
 
-/* ==================  */
+    return gp;
+}
 
-/* ====== MEEPLES =====*/
+/* =========== GESTION DES MEEPLES =========== */
 void place_meeple(board_t* board, game_players_t* players, direction_t dir, position_t pos, color_t color) {
     tile_t* tile = &board->grid[pos.x][pos.y];
     tile->has_meeple      = true;
@@ -314,10 +246,72 @@ void remove_meeple(board_t* board, game_players_t* players, position_t pos) {
     }
     fprintf(stderr, "⚠️ Avertissement : aucune couleur correspondante trouvée pour rendre un meeple.\n");
 }
-/* ==================  */
 
-/* ====== POSITIONS VALIDES =====*/
-// Allocation d'une structure valid_positions
+/* =========== FRONTIÈRES DU PLATEAU =========== */
+frontiers_t* create_frontier(void) {
+    frontiers_t* frontier = malloc(sizeof *frontier);
+    if (!frontier) {
+        fprintf(stderr, "Erreur : allocation de frontiers_t échouée.\n");
+        exit(EXIT_FAILURE);
+    }
+    frontier->size = 0;
+    frontier->capacity = NB_TILES;
+    frontier->positions = malloc(frontier->capacity * sizeof(position_t));
+    if (!frontier->positions) {
+        fprintf(stderr, "Erreur : allocation du tableau de positions échouée.\n");
+        free(frontier);
+        exit(EXIT_FAILURE);
+    }
+    return frontier;
+}
+
+void free_frontier(frontiers_t** frontier_ptr) {
+    if (!frontier_ptr || !*frontier_ptr) return;
+    free((*frontier_ptr)->positions);
+    free(*frontier_ptr);
+    *frontier_ptr = NULL;
+}
+
+bool is_in_frontier(frontiers_t* frontier, position_t pos) {
+    for (int i = 0; i < frontier->size; i++) {
+        if (frontier->positions[i].x == pos.x && frontier->positions[i].y == pos.y)
+            return true;
+    }
+    return false;
+}
+
+void add_to_frontier(frontiers_t* frontier, position_t pos) {
+    if (!is_in_frontier(frontier, pos)) {
+        if (frontier->size < frontier->capacity) {
+            frontier->positions[frontier->size++] = pos;
+        } else {
+            fprintf(stderr, "Erreur : frontière pleine, impossible d'ajouter (%d, %d)\n", pos.x, pos.y);
+        }
+    }
+}
+
+void remove_from_frontier(frontiers_t* frontier, position_t pos) {
+    for (int i = 0; i < frontier->size; i++) {
+        if (frontier->positions[i].x == pos.x && frontier->positions[i].y == pos.y) {
+            frontier->positions[i] = frontier->positions[--frontier->size];
+            return;
+        }
+    }
+}
+
+void update_frontier_after_placement(board_t* board, frontiers_t* frontier, position_t pos) {
+    position_t directions[4] = { {-1,0}, {0,1}, {1,0}, {0,-1} };
+    for (int i = 0; i < 4; i++) {
+        position_t neighbor = { pos.x + directions[i].x, pos.y + directions[i].y };
+        if (neighbor.x >= 0 && neighbor.x < board->height &&
+            neighbor.y >= 0 && neighbor.y < board->width &&
+            is_cell_empty(board, neighbor)) {
+            add_to_frontier(frontier, neighbor);
+        }
+    }
+}
+
+/* =========== POSITIONS VALIDES =========== */
 valid_positions_t* create_valid_positions(void) {
     valid_positions_t* vp = malloc(sizeof *vp);
     if (!vp) {
@@ -337,7 +331,6 @@ valid_positions_t* create_valid_positions(void) {
     return vp;
 }
 
-// Libération mémoire
 void destroy_valid_positions(valid_positions_t** vp_ptr) {
     if (!vp_ptr || !*vp_ptr) return;
     free((*vp_ptr)->positions);
@@ -345,12 +338,10 @@ void destroy_valid_positions(valid_positions_t** vp_ptr) {
     *vp_ptr = NULL;
 }
 
-// Réinitialisation (sans libérer)
 void reset_valid_positions(valid_positions_t* vp) {
     if (vp) vp->size = 0;
 }
 
-// Ajout d'une position, avec redimensionnement si nécessaire
 void add_valid_position(valid_positions_t* vp, position_t pos) {
     if (vp->size == vp->capacity) {
         vp->capacity *= 2;
@@ -361,10 +352,11 @@ void add_valid_position(valid_positions_t* vp, position_t pos) {
         }
         vp->positions = tmp;
     }
-
     vp->positions[vp->size++] = pos;
 }
-/* ==================  */
+
+
+/*A FAIIIIIIIIIIIIIIIIIIIIIIRE*/
 
 bool check_matching_zones(board_t* bd, tile_t t, position_t p) {
     position_t dirs[4] = {{-1,0},{0,1},{1,0},{0,-1}};
@@ -382,25 +374,21 @@ bool check_matching_zones(board_t* bd, tile_t t, position_t p) {
 }
 
 
-void get_placement_tile(board_t* board,
-    frontiers_t* frontier,
-    tile_t tile,
-    degree_t rot,
-    valid_positions_t* v)
+void get_placement_tile(board_t* board,frontiers_t* frontiere,tile_t tile,degree_t rot,valid_positions_t* v)
 {
-// tourne une copie selon rot
-tile_t tmp = tile;
-for (int r = 0; r < (int)rot; r++) {
-rotate_tile(&tmp, NINETY);
-}
-reset_valid_positions(v);
-// teste uniquement la rotation courante
-for (int i = 0; i < frontier->size; i++) {
-position_t p = frontier->positions[i];
-if (check_matching_zones(board, tmp, p)) {
-add_valid_position(v, p);
-}
-}
+    // tourne une copie selon rot
+    tile_t tmp = tile;
+    for (int r = 0; r < (int)rot; r++) {
+    rotate_tile(&tmp, NINETY);
+    }
+    reset_valid_positions(v);
+    // teste uniquement la rotation courante
+    for (int i = 0; i < frontiere->size; i++) {
+        position_t p = frontiere->positions[i];
+        if (check_matching_zones(board, tmp, p)) {
+            add_valid_position(v, p);
+        }
+    }
 }
 
 game_t init_game(int H, int W, const char* fn) {
@@ -417,54 +405,81 @@ game_t init_game(int H, int W, const char* fn) {
     return G;
 }
 
+// Deux types sont considérés équivalents pour l'occupation d'une structure
 bool feature_matches(zone_type_t a, zone_type_t b) {
-    return a==b || (a==CITY && b==SHIELD) || (a==SHIELD && b==CITY);
+    return a == b || (a == CITY && b == SHIELD) || (a == SHIELD && b == CITY);
 }
 
-bool dfs_has_meeple(board_t* bd,int x,int y,direction_t z,zone_type_t tgt,bool* vs) {
-    int idx = (x*bd->width + y)*5 + z;
-    if(vs[idx]) return false;
-    vs[idx] = true;
-    tile_t* tl = &bd->grid[x][y];
-    if(tl->has_meeple && tl->meeple_position == z) return true;
-    if(z==CENTER || feature_matches(tl->zones[CENTER], tgt)) {
-        for (direction_t i = 0; i < CENTER; i++) {
-            if (i!=z && feature_matches(tl->zones[i], tgt)) {
-                if (dfs_has_meeple(bd,x,y,i,tgt,vs)) return true;
+// DFS : détecte si un meeple est déjà présent dans la même structure connectée
+bool dfs_has_meeple(board_t* board, int x, int y, direction_t dir, zone_type_t target, bool* visited) {
+    int idx = (x * board->width + y) * 5 + dir;
+    if (visited[idx]) return false;
+    visited[idx] = true;
+
+    tile_t* tile = &board->grid[x][y];
+
+    if (tile->has_meeple && tile->meeple_position == dir)
+        return true;
+
+    // Exploration interne (centre connecté aux bords)
+    if (dir == CENTER || feature_matches(tile->zones[CENTER], target)) {
+        for (direction_t d = 0; d < CENTER; d++) {
+            if (d != dir && feature_matches(tile->zones[d], target)) {
+                if (dfs_has_meeple(board, x, y, d, target, visited))
+                    return true;
             }
         }
     }
-    if(z < CENTER) {
-        static const int DX[4]={-1,0,1,0}, DY[4]={0,1,0,-1};
-        static const direction_t OPP[4]={SOUTH,WEST,NORTH,EAST};
-        int nx=x+DX[z], ny=y+DY[z];
-        if(nx>=0&&nx<bd->height&&ny>=0&&ny<bd->width
-           && feature_matches(bd->grid[nx][ny].zones[OPP[z]], tgt)) {
-            if(dfs_has_meeple(bd,nx,ny,OPP[z],tgt,vs)) return true;
+
+    // Exploration vers la tuile voisine (si ce n’est pas le centre)
+    if (dir < CENTER) {
+        static const int DX[4] = {-1, 0, 1, 0};
+        static const int DY[4] = { 0, 1, 0, -1};
+        static const direction_t OPP[4] = {SOUTH, WEST, NORTH, EAST};
+
+        int nx = x + DX[dir], ny = y + DY[dir];
+
+        if (nx >= 0 && nx < board->height && ny >= 0 && ny < board->width) {
+            tile_t* neighbor = &board->grid[nx][ny];
+            if (feature_matches(neighbor->zones[OPP[dir]], target)) {
+                if (dfs_has_meeple(board, nx, ny, OPP[dir], target, visited))
+                    return true;
+            }
         }
     }
+
     return false;
 }
 
-meeple_options_t get_placement_meeple(board_t* bd, position_t p) {
-    meeple_options_t opt = {{false,false,false,false,false}};
-    tile_t* tl = &bd->grid[p.x][p.y];
-    if(tl->has_meeple) return opt;
-    int ts = bd->height * bd->width * 5;
-    bool* vs = calloc(ts, sizeof(bool));
-    for(int z=0; z<5; z++){
-        zone_type_t tp = tl->zones[z];
-        if(tp==NONE) continue;
-        if(tp==ABBEY) opt.available[z] = true;
-        else if(tp==ROAD||tp==CITY||tp==SHIELD){
-            memset(vs,0,ts);
-            if(!dfs_has_meeple(bd,p.x,p.y,(direction_t)z,tp,vs))
-                opt.available[z] = true;
+// Détermine les zones où un meeple peut être placé sur une tuile à la position donnée
+meeple_options_t get_placement_meeple(board_t* board, position_t pos) {
+    meeple_options_t options = { .available = { false, false, false, false, false } };
+    tile_t* tile = &board->grid[pos.x][pos.y];
+
+    if (tile->has_meeple)
+        return options;
+
+    int total_size = board->height * board->width * 5;
+    bool* visited = calloc(total_size, sizeof(bool));
+
+    for (int z = 0; z < 5; z++) {
+        zone_type_t zone_type = tile->zones[z];
+        if (zone_type == NONE) continue;
+
+        if (zone_type == ABBEY) {
+            options.available[z] = true;
+        } else if (zone_type == ROAD || zone_type == CITY || zone_type == SHIELD) {
+            memset(visited, 0, total_size);
+            if (!dfs_has_meeple(board, pos.x, pos.y, (direction_t)z, zone_type, visited)) {
+                options.available[z] = true;
+            }
         }
     }
-    free(vs);
-    return opt;
+
+    free(visited);
+    return options;
 }
+
 
 void place_tile(board_t* bd, frontiers_t* f, tile_t t, position_t p) {
     bd->grid[p.x][p.y] = t;
