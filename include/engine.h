@@ -21,22 +21,13 @@ typedef struct {
     int* meeple_count_per_player;
 } structure_score_t;
 
-// Initialise un plateau vide
-board_t* initialize_board(int height, int width);
+board_t* create_board(int height, int width);
 
-// Libère la mémoire allouée pour un plateau
-void free_board(board_t* board);
-
-// Charge le pack de tuiles depuis un fichier CSV
+void destroy_board(board_t* board);
 tiles_pack_t initialize_tile_pack(const char* filename);
-
-// Mélange aléatoirement le pack de tuiles
 void shuffle_tile_pack(tiles_pack_t* tile_pack);
-
-// Crée les joueurs en demandant leur nombre et noms
 game_players_t create_players(void);
 
-// Pioche la prochaine tuile du pack
 tile_t pick_tile(tiles_pack_t* tile_pack);
 
 // Tourne une tuile de deg degrés
@@ -72,17 +63,21 @@ void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t p
 // Retire un meeple de la tuile de position p
 void remove_meeple(board_t* bd, game_players_t* gp, position_t p);
 
-// Alloue la liste des positions valides pour tuile
-valid_positions_t* allocate_valid_positions(void);
 
-// Libère la liste de positions valides
-void free_valid_positions(valid_positions_t** v);
+valid_positions_t* create_valid_positions(void);
+void destroy_valid_positions(valid_positions_t** vp_ptr);
 
-// Réinitialise la liste de positions valides
-void reset_valid_positions(valid_positions_t* v);
+// Réinitialisation
+void reset_valid_positions(valid_positions_t* vp);
 
-// Ajoute pos à la liste de positions valides
-void add_to_valid_positions(valid_positions_t* v, position_t pos);
+// Ajout dynamique
+void add_valid_position(valid_positions_t* vp, position_t pos);
+
+// (optionnel) Vérification de présence
+bool is_valid_position(valid_positions_t* vp, position_t pos);
+
+
+
 
 // Vérifie si une tuile peut être placée à pos selon zones
 bool check_matching_zones(board_t* board, tile_t tile, position_t pos);

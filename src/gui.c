@@ -59,14 +59,14 @@ void print_tile(tile_t t) {
 
 void gui_display_positions(valid_positions_t* v) {
     printf("\n\033[0;36m╭─ Positions valides ─────────────────╮\033[0m\n");
-    for (int i = 0; i < v->actual; i++) {
+    for (int i = 0; i < v->size; i++) {
         printf(" [%2d] (%2d,%2d)   ",
                i,
-               v->valid_positions[i].x,
-               v->valid_positions[i].y);
+               v->positions[i].x,
+               v->positions[i].y);
         if ((i + 1) % 2 == 0) printf("\n");
     }
-    if (v->actual % 2) printf("\n");
+    if (v->size % 2) printf("\n");
     printf("\033[0;36m╰──────────────────────────────────────╯\033[0m\n\n");
 }
 
@@ -112,8 +112,8 @@ void print_board(board_t *board,
             tile_t t = board->grid[by][bx];
             bool hl_valid = false, hl_cursor = false;
             if (g_valid) {
-                for (int i = 0; i < g_valid->actual; i++) {
-                    position_t vp = g_valid->valid_positions[i];
+                for (int i = 0; i < g_valid->size; i++) {
+                    position_t vp = g_valid->positions[i];
                     if (vp.x == by && vp.y == bx) { hl_valid = true; break; }
                 }
             }
@@ -130,8 +130,8 @@ void print_board(board_t *board,
             tile_t t = board->grid[by][bx];
             bool hl_valid = false, hl_cursor = false;
             if (g_valid) {
-                for (int i = 0; i < g_valid->actual; i++) {
-                    position_t vp = g_valid->valid_positions[i];
+                for (int i = 0; i < g_valid->size; i++) {
+                    position_t vp = g_valid->positions[i];
                     if (vp.x == by && vp.y == bx) { hl_valid = true; break; }
                 }
             }
@@ -160,8 +160,8 @@ void print_board(board_t *board,
             tile_t t = board->grid[by][bx];
             bool hl_valid = false, hl_cursor = false;
             if (g_valid) {
-                for (int i = 0; i < g_valid->actual; i++) {
-                    position_t vp = g_valid->valid_positions[i];
+                for (int i = 0; i < g_valid->size; i++) {
+                    position_t vp = g_valid->positions[i];
                     if (vp.x == by && vp.y == bx) { hl_valid = true; break; }
                 }
             }
@@ -208,8 +208,8 @@ void print_board(board_t *board,
             tile_t t = board->grid[by][bx];
             bool hl_valid = false, hl_cursor = false;
             if (g_valid) {
-                for (int i = 0; i < g_valid->actual; i++) {
-                    position_t vp = g_valid->valid_positions[i];
+                for (int i = 0; i < g_valid->size; i++) {
+                    position_t vp = g_valid->positions[i];
                     if (vp.x == by && vp.y == bx) { hl_valid = true; break; }
                 }
             }
@@ -238,8 +238,8 @@ void print_board(board_t *board,
             bool hl_valid = false, hl_cursor = false;
             int by = offsetY + ty; /* correction d’index dans cette boucle */
             if (g_valid) {
-                for (int i = 0; i < g_valid->actual; i++) {
-                    position_t vp = g_valid->valid_positions[i];
+                for (int i = 0; i < g_valid->size; i++) {
+                    position_t vp = g_valid->positions[i];
                     if (vp.x == by && vp.y == bx) { hl_valid = true; break; }
                 }
             }

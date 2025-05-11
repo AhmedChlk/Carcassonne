@@ -6,20 +6,6 @@
 // === CONSTANTES ===
 #define NB_TILES 72  // Nombre total de tuiles
 
-// === STRUCTURES DE POSITIONNEMENT ===
-typedef struct { int x, y; } position_t;
-
-// Liste dynamique de positions valides
-typedef struct {
-    position_t* valid_positions;
-    int actual, capacity;
-} valid_positions_t;
-
-// Structure pour la frontière de placement
-typedef struct {
-    position_t* positions;
-    int actual, capacity;
-} frontiers_t;
 
 // === ÉNUMÉRATIONS ===
 
@@ -44,7 +30,6 @@ typedef enum {
 } degree_t;
 
 // === STRUCTURES DE JEU ===
-
 // Représente une tuile et un meeple éventuel
 typedef struct {
     zone_type_t zones[5];
@@ -63,5 +48,22 @@ typedef struct {
 typedef struct {
     bool available[5];
 } meeple_options_t;
+
+// === STRUCTURES DE POSITIONNEMENT ===
+typedef struct { int x, y; } position_t;
+
+// Structure pour la frontière de placement
+typedef struct {
+    position_t* positions;
+    int size;       // nombre courant d'éléments
+    int capacity;   // capacité maximale allouée
+} frontiers_t;
+
+// Liste dynamique de positions valides
+typedef struct {
+    position_t* positions;
+    int size;       // nombre courant de positions valides
+    int capacity;   // capacité du tableau
+} valid_positions_t;
 
 #endif // TILE_H

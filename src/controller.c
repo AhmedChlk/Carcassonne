@@ -201,8 +201,8 @@ void game_loop(game_t *game) {
             }
             if (cmd == '\n') {
                 bool ok = false;
-                for (int i = 0; i < game->valid_positions->actual; i++) {
-                    position_t vp = game->valid_positions->valid_positions[i];
+                for (int i = 0; i < game->valid_positions->size; i++) {
+                    position_t vp = game->valid_positions->positions[i];
                     if (vp.x == cursor.x && vp.y == cursor.y) {
                         ok = true;
                         break;
