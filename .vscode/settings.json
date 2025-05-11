@@ -1,0 +1,7 @@
+{
+  "files.associations": {
+    "ansi_colors.h": "c",
+    "controller.h": "c",
+    "unistd.h": "c"
+  }
+}

@@ -14,6 +14,13 @@ typedef struct {
     valid_positions_t* valid_positions;
 } game_t;
 
+
+typedef struct {
+    int tile_count;
+    int shield_count;
+    int* meeple_count_per_player;
+} structure_score_t;
+
 // Initialise un plateau vide
 board_t* initialize_board(int height, int width);
 
@@ -101,5 +108,5 @@ void score_completed_structures(game_t* G, position_t last_pos);
 void free_game(game_t* game);
 
 void score_incomplete_structures(game_t* game);
-
+structure_score_t bfs_structure(board_t* board,game_players_t* players,int start_x,int start_y,zone_type_t target_feature,bool* visited);
 #endif // ENGINE_H
