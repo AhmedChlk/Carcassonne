@@ -7,37 +7,11 @@
 #include "engine.h"
 #include "player.h"
 
-// === VARIABLES INTERNES ===
 static bool *scored = NULL;
-static bool *vis_zone = NULL;  // pour marques DFS sur zones
-static bool *vis_tile = NULL;  // pour marques DFS sur tuiles
 
-void reset_scored(void) {
+static void reset_scored(void) {
     free(scored);
     scored = NULL;
-}
-
-// === INITIALISATION & LIBÉRATION ===
-game_t init_game(int H, int W, const char* fn) {
-    game_t G;
-    G.board           = initialize_board(H, W);
-    G.frontier        = allocate_frontier();
-    G.valid_positions = allocate_valid_positions();
-    G.tile_pack       = initialize_tile_pack(fn);
-    tile_t st         = pick_tile(&G.tile_pack);
-    position_t c      = { H/2, W/2 };
-    place_tile(G.board, G.frontier, st, c);
-    shuffle_tile_pack(&G.tile_pack);
-    G.players         = create_players();
-    return G;
-}
-
-void free_game(game_t* game) {
-    free_frontier(&game->frontier);
-    free_valid_positions(&game->valid_positions);
-    free_board(game->board);
-    free(game->players.players);
-    reset_scored();
 }
 
 board_t* initialize_board(int h, int w) {
@@ -69,6 +43,47 @@ void free_board(board_t* bd) {
         free(bd->grid[i]);
     free(bd->grid);
     free(bd);
+}
+
+tiles_pack_t initialize_tile_pack(const char* fn) {
+    char path[256] = "data/";
+    strcat(path, fn);
+    FILE* f = fopen(path, "r");
+    if (!f) { fprintf(stderr, "Erreur open %s\n", path); exit(EXIT_FAILURE); }
+    tiles_pack_t tp;
+    tp.remaining_tiles = 10;
+    char buf[1024];
+    int zi, ti = 0;
+    while (fgets(buf, sizeof buf, f)) {
+        zi = 0;
+        char* tok = strtok(buf, ",\n");
+        while (tok) {
+            if      (!strcmp(tok, "blason"))  tp.tiles[ti].zones[zi++] = SHIELD;
+            else if (!strcmp(tok, "route"))   tp.tiles[ti].zones[zi++] = ROAD;
+            else if (!strcmp(tok, "pre"))     tp.tiles[ti].zones[zi++] = FIELD;
+            else if (!strcmp(tok, "village")) tp.tiles[ti].zones[zi++] = VILLAGE;
+            else if (!strcmp(tok, "ville"))   tp.tiles[ti].zones[zi++] = CITY;
+            else if (!strcmp(tok, "abbaye"))  tp.tiles[ti].zones[zi++] = ABBEY;
+            tok = strtok(NULL, ",\n");
+        }
+        tp.tiles[ti].has_meeple = false;
+        tp.tiles[ti].meeple_position = NO_DIRECTION;
+        tp.tiles[ti].meeple_color = NO_COLOR;
+        ti++;
+    }
+    fclose(f);
+    return tp;
+}
+
+
+void shuffle_tile_pack(tiles_pack_t* tp) {
+    for (int i = 0; i < NB_TILES; i++) {
+        int a = rand() % NB_TILES, b;
+        do { b = rand() % NB_TILES; } while (a == b);
+        tile_t tmp = tp->tiles[a];
+        tp->tiles[a] = tp->tiles[b];
+        tp->tiles[b] = tmp;
+    }
 }
 
 game_players_t create_players(){
@@ -136,112 +151,6 @@ game_players_t create_players(){
     return gp;
 }
 
-tiles_pack_t initialize_tile_pack(const char* fn) {
-    char path[256] = "data/";
-    strcat(path, fn);
-    FILE* f = fopen(path, "r");
-    if (!f) { fprintf(stderr, "Erreur open %s\n", path); exit(EXIT_FAILURE); }
-    tiles_pack_t tp;
-    tp.remaining_tiles = NB_TILES;
-    char buf[1024];
-    int zi, ti = 0;
-    while (fgets(buf, sizeof buf, f)) {
-        zi = 0;
-        char* tok = strtok(buf, ",\n");
-        while (tok) {
-            if      (!strcmp(tok, "blason"))  tp.tiles[ti].zones[zi++] = SHIELD;
-            else if (!strcmp(tok, "route"))   tp.tiles[ti].zones[zi++] = ROAD;
-            else if (!strcmp(tok, "pre"))     tp.tiles[ti].zones[zi++] = FIELD;
-            else if (!strcmp(tok, "village")) tp.tiles[ti].zones[zi++] = VILLAGE;
-            else if (!strcmp(tok, "ville"))   tp.tiles[ti].zones[zi++] = CITY;
-            else if (!strcmp(tok, "abbaye"))  tp.tiles[ti].zones[zi++] = ABBEY;
-            tok = strtok(NULL, ",\n");
-        }
-        tp.tiles[ti].has_meeple = false;
-        tp.tiles[ti].meeple_position = NO_DIRECTION;
-        tp.tiles[ti].meeple_color = NO_COLOR;
-        ti++;
-    }
-    fclose(f);
-    return tp;
-}
-
-frontiers_t* allocate_frontier(void) {
-    frontiers_t* f = malloc(sizeof *f);
-    f->actual   = 0;
-    f->capacity = NB_TILES;
-    f->positions = malloc(f->capacity * sizeof(position_t));
-    return f;
-}
-
-void free_frontier(frontiers_t** f) {
-    free((*f)->positions);
-    free(*f);
-    *f = NULL;
-}
-
-valid_positions_t* allocate_valid_positions(void) {
-    valid_positions_t* v = malloc(sizeof *v);
-    v->actual   = 0;
-    v->capacity = NB_TILES;
-    v->valid_positions = malloc(v->capacity * sizeof(position_t));
-    return v;
-}
-
-void free_valid_positions(valid_positions_t** v) {
-    free((*v)->valid_positions);
-    free(*v);
-    *v = NULL;
-}
-
-// === UTILITAIRES ===
-bool check_matching_zones(board_t* bd, tile_t t, position_t p) {
-    position_t dirs[4] = {{-1,0},{0,1},{1,0},{0,-1}};
-    direction_t opp[4] = { SOUTH, WEST, NORTH, EAST };
-    for (int k = 0; k < 4; k++) {
-        int nx = p.x + dirs[k].x;
-        int ny = p.y + dirs[k].y;
-        if (nx>=0 && nx<bd->height && ny>=0 && ny<bd->width && bd->grid[nx][ny].zones[opp[k]]!=NONE) {
-            zone_type_t z = bd->grid[nx][ny].zones[opp[k]];
-            if (t.zones[k]!=z && !((t.zones[k]==SHIELD&&z==CITY)||(t.zones[k]==CITY&&z==SHIELD)))
-                return false;
-        }
-    }
-    return true;
-}
-
-bool is_cell_empty(board_t* bd, position_t pos) {
-    for (int i = 0; i < 5; i++)
-        if (bd->grid[pos.x][pos.y].zones[i] != NONE)
-            return false;
-    return true;
-}
-
-bool feature_matches(zone_type_t a, zone_type_t b) {
-    return a==b || (a==CITY && b==SHIELD) || (a==SHIELD && b==CITY);
-}
-
-bool has_tile(board_t* bd, int x, int y) {
-    for (int d = 0; d < 5; d++) {
-        if (bd->grid[x][y].zones[d] != NONE)
-            return true;
-    }
-    return false;
-}
-
-// === MANIPULATION DES TUILES ===
-
-void shuffle_tile_pack(tiles_pack_t* tp) {
-    for (int i = 0; i < NB_TILES; i++) {
-        int a = rand() % NB_TILES, b;
-        do { b = rand() % NB_TILES; } while (a == b);
-        tile_t tmp = tp->tiles[a];
-        tp->tiles[a] = tp->tiles[b];
-        tp->tiles[b] = tmp;
-    }
-}
-
-
 tile_t pick_tile(tiles_pack_t* tp) {
     return tp->tiles[--tp->remaining_tiles];
 }
@@ -272,36 +181,57 @@ void rotate_tile(tile_t* t, degree_t deg) {
     }
 }
 
-void place_tile(board_t* bd, frontiers_t* f, tile_t t, position_t p) {
-    bd->grid[p.x][p.y] = t;
-    if(f) {
-        update_frontier_after_placement(bd, f, p);
-        if(is_in_frontier(f, p)) remove_from_frontier(f, p);
-    }
+
+bool is_cell_empty(board_t* bd, position_t pos) {
+    for (int i = 0; i < 5; i++)
+        if (bd->grid[pos.x][pos.y].zones[i] != NONE)
+            return false;
+    return true;
 }
 
-void get_placement_tile(board_t* board,frontiers_t* frontier,tile_t tile,degree_t rot,valid_positions_t* v)
-{
-    // Crée une copie de la tuile et applique la rotation souhaitée
-    tile_t tmp = tile;
-    for (int r = 0; r < (int)rot; r++) {
-        rotate_tile(&tmp, NINETY);
-    }
+bool is_in_frontier(frontiers_t* f, position_t p) {
+    for (int i = 0; i < f->actual; i++)
+        if (f->positions[i].x == p.x && f->positions[i].y == p.y)
+            return true;
+    return false;
+}
 
-    // Réinitialise les positions valides
-    reset_valid_positions(v);
+frontiers_t* allocate_frontier(void) {
+    frontiers_t* f = malloc(sizeof *f);
+    f->actual   = 0;
+    f->capacity = NB_TILES;
+    f->positions = malloc(f->capacity * sizeof(position_t));
+    return f;
+}
 
-    // Vérifie chaque position de la frontière pour voir si la tuile peut être placée
-    for (int i = 0; i < frontier->actual; i++) {
-        position_t p = frontier->positions[i];
-        if (check_matching_zones(board, tmp, p)) {
-            add_to_valid_positions(v, p);
+void free_frontier(frontiers_t** f) {
+    free((*f)->positions);
+    free(*f);
+    *f = NULL;
+}
+
+void add_to_frontier(frontiers_t* f, position_t p) {
+    if (!is_in_frontier(f, p))
+        f->positions[f->actual++] = p;
+}
+
+void remove_from_frontier(frontiers_t* f, position_t p) {
+    for (int i = 0; i < f->actual; i++) {
+        if (f->positions[i].x == p.x && f->positions[i].y == p.y) {
+            f->positions[i] = f->positions[--f->actual];
+            return;
         }
     }
 }
 
-
-// === MEEPLES ===
+void update_frontier_after_placement(board_t* bd, frontiers_t* f, position_t p) {
+    position_t dirs[4] = {{-1,0},{0,1},{1,0},{0,-1}};
+    for (int k = 0; k < 4; k++) {
+        position_t q = { p.x + dirs[k].x, p.y + dirs[k].y };
+        if (q.x >= 0 && q.x < bd->height && q.y >= 0 && q.y < bd->width && is_cell_empty(bd, q))
+            add_to_frontier(f, q);
+    }
+}
 
 void place_meeple(board_t* bd, game_players_t* gp, direction_t d, position_t p, color_t c) {
     bd->grid[p.x][p.y].has_meeple     = true;
@@ -328,6 +258,86 @@ void remove_meeple(board_t* bd, game_players_t* gp, position_t p) {
     }
 }
 
+valid_positions_t* allocate_valid_positions(void) {
+    valid_positions_t* v = malloc(sizeof *v);
+    v->actual   = 0;
+    v->capacity = NB_TILES;
+    v->valid_positions = malloc(v->capacity * sizeof(position_t));
+    return v;
+}
+
+void free_valid_positions(valid_positions_t** v) {
+    free((*v)->valid_positions);
+    free(*v);
+    *v = NULL;
+}
+
+void reset_valid_positions(valid_positions_t* v) {
+    v->actual = 0;
+}
+
+void add_to_valid_positions(valid_positions_t* v, position_t p) {
+    if (v->actual == v->capacity) {
+        v->capacity *= 2;
+        v->valid_positions = realloc(v->valid_positions, v->capacity * sizeof(position_t));
+    }
+    v->valid_positions[v->actual++] = p;
+}
+
+bool check_matching_zones(board_t* bd, tile_t t, position_t p) {
+    position_t dirs[4] = {{-1,0},{0,1},{1,0},{0,-1}};
+    direction_t opp[4] = { SOUTH, WEST, NORTH, EAST };
+    for (int k = 0; k < 4; k++) {
+        int nx = p.x + dirs[k].x;
+        int ny = p.y + dirs[k].y;
+        if (nx>=0 && nx<bd->height && ny>=0 && ny<bd->width && bd->grid[nx][ny].zones[opp[k]]!=NONE) {
+            zone_type_t z = bd->grid[nx][ny].zones[opp[k]];
+            if (t.zones[k]!=z && !((t.zones[k]==SHIELD&&z==CITY)||(t.zones[k]==CITY&&z==SHIELD)))
+                return false;
+        }
+    }
+    return true;
+}
+
+
+void get_placement_tile(board_t* board,
+    frontiers_t* frontier,
+    tile_t tile,
+    degree_t rot,
+    valid_positions_t* v)
+{
+// tourne une copie selon rot
+tile_t tmp = tile;
+for (int r = 0; r < (int)rot; r++) {
+rotate_tile(&tmp, NINETY);
+}
+reset_valid_positions(v);
+// teste uniquement la rotation courante
+for (int i = 0; i < frontier->actual; i++) {
+position_t p = frontier->positions[i];
+if (check_matching_zones(board, tmp, p)) {
+add_to_valid_positions(v, p);
+}
+}
+}
+
+game_t init_game(int H, int W, const char* fn) {
+    game_t G;
+    G.board           = initialize_board(H, W);
+    G.frontier        = allocate_frontier();
+    G.valid_positions = allocate_valid_positions();
+    G.tile_pack       = initialize_tile_pack(fn);
+    tile_t st         = pick_tile(&G.tile_pack);
+    position_t c      = { H/2, W/2 };
+    place_tile(G.board, G.frontier, st, c);
+    shuffle_tile_pack(&G.tile_pack);
+    G.players         = create_players();
+    return G;
+}
+
+bool feature_matches(zone_type_t a, zone_type_t b) {
+    return a==b || (a==CITY && b==SHIELD) || (a==SHIELD && b==CITY);
+}
 
 bool dfs_has_meeple(board_t* bd,int x,int y,direction_t z,zone_type_t tgt,bool* vs) {
     int idx = (x*bd->width + y)*5 + z;
@@ -374,56 +384,24 @@ meeple_options_t get_placement_meeple(board_t* bd, position_t p) {
     return opt;
 }
 
+void place_tile(board_t* bd, frontiers_t* f, tile_t t, position_t p) {
+    bd->grid[p.x][p.y] = t;
+    if(f) {
+        update_frontier_after_placement(bd, f, p);
+        if(is_in_frontier(f, p)) remove_from_frontier(f, p);
+    }
+}
 
-// === GESTION DES FRONTIÈRES ===
 
-bool is_in_frontier(frontiers_t* f, position_t p) {
-    for (int i = 0; i < f->actual; i++)
-        if (f->positions[i].x == p.x && f->positions[i].y == p.y)
+
+static bool has_tile(board_t* bd, int x, int y) {
+    for (int d = 0; d < 5; d++) {
+        if (bd->grid[x][y].zones[d] != NONE)
             return true;
+    }
     return false;
 }
 
-void add_to_frontier(frontiers_t* f, position_t p) {
-    if (!is_in_frontier(f, p))
-        f->positions[f->actual++] = p;
-}
-
-void remove_from_frontier(frontiers_t* f, position_t p) {
-    for (int i = 0; i < f->actual; i++) {
-        if (f->positions[i].x == p.x && f->positions[i].y == p.y) {
-            f->positions[i] = f->positions[--f->actual];
-            return;
-        }
-    }
-}
-
-void update_frontier_after_placement(board_t* bd, frontiers_t* f, position_t p) {
-    position_t dirs[4] = {{-1,0},{0,1},{1,0},{0,-1}};
-    for (int k = 0; k < 4; k++) {
-        position_t q = { p.x + dirs[k].x, p.y + dirs[k].y };
-        if (q.x >= 0 && q.x < bd->height && q.y >= 0 && q.y < bd->width && is_cell_empty(bd, q))
-            add_to_frontier(f, q);
-    }
-}
-
-
-
-// === POSITIONS VALIDES POUR LES TUILES ===
-
-void reset_valid_positions(valid_positions_t* v) {
-    v->actual = 0;
-}
-
-void add_to_valid_positions(valid_positions_t* v, position_t p) {
-    if (v->actual == v->capacity) {
-        v->capacity *= 2;
-        v->valid_positions = realloc(v->valid_positions, v->capacity * sizeof(position_t));
-    }
-    v->valid_positions[v->actual++] = p;
-}
-
-// === CALCUL DES SCORES ===
 void score_completed_structures(game_t* game, position_t last_pos) {
     board_t* bd = game->board;
     game_players_t* gp = &game->players;
@@ -603,136 +581,151 @@ void score_completed_structures(game_t* game, position_t last_pos) {
 
 }
 
-void final_scoring(game_t *game) {
-    board_t *bd = game->board;
-    int H = bd->height, W = bd->width;
-    int total_z = H * W * 5;
-    int total_t = H * W;
+void free_game(game_t* game) {
+    free_frontier(&game->frontier);
+    free_valid_positions(&game->valid_positions);
+    free_board(game->board);
+    free(game->players.players);
+    reset_scored();
+}
+void score_incomplete_structures(game_t* game) {
+    board_t* bd = game->board;
+    game_players_t* gp = &game->players;
+    int H = bd->height, W = bd->width, N = H * W;
 
-    // Allocation des marqueurs
-    vis_zone = calloc(total_z, sizeof *vis_zone);
-    vis_tile = calloc(total_t, sizeof *vis_tile);
-    if (!vis_zone || !vis_tile) { perror("calloc"); exit(EXIT_FAILURE); }
-
-    // 1) Routes et Villes incomplètes
-    const int DX[4] = {-1,0,1,0}, DY[4] = {0,1,0,-1};
-    const direction_t OPP[4] = {SOUTH, WEST, NORTH, EAST};
-
+    // --- Abbaye incomplète (inchangé) ---
     for (int x = 0; x < H; x++) {
         for (int y = 0; y < W; y++) {
-            for (int side = 0; side < 4; side++) {
-                int zidx = (x*W + y)*5 + side;
-                zone_type_t type = bd->grid[x][y].zones[side];
-                if ((type != ROAD && type != CITY) || vis_zone[zidx]) 
-                    continue;
-                // BFS sur cette structure
-                bool closed = true;
-                int qh=0, qt=0;
-                int *q = malloc(total_z * sizeof *q);
-                int tile_count = 0, shield_count = 0;
-                int *mcount = calloc(game->players.num_players, sizeof(int));
-                // init
-                vis_zone[zidx] = true;
-                q[qt++] = zidx;
-                while (qh < qt) {
-                    int idx = q[qh++];
-                    int cz = idx % 5;
-                    int tid = idx / 5;
-                    int tx = tid / W, ty = tid % W;
-                    tile_t *t = &bd->grid[tx][ty];
-                    // première fois sur cette tuile ?
-                    if (!vis_tile[tid]) {
-                        vis_tile[tid] = true;
-                        tile_count++;
-                        // boucliers dans villes
-                        if (type == CITY) {
-                            for (int d2 = 0; d2 < 5; d2++)
-                                if (t->zones[d2] == SHIELD) shield_count++;
-                        }
-                    }
-                    // meeple
-                    if (t->has_meeple && (int) t->meeple_position == cz) {
-                        // compte pour joueur
-                        for (int pi=0; pi<game->players.num_players; pi++) {
-                            if (game->players.players[pi].meeple_color == t->meeple_color)
-                                mcount[pi]++;
-                        }
-                    }
-                    // intra-tile connexions
-                    for (int dz=0; dz<5; dz++) {
-                        int nidx = tid*5 + dz;
-                        if (vis_zone[nidx]) continue;
-                        if (t->zones[dz] == type &&
-                            (cz==CENTER || dz==CENTER || t->zones[CENTER]==type)) {
-                            vis_zone[nidx] = true;
-                            q[qt++] = nidx;
-                        }
-                    }
-                    // inter-tile connexions
-                    if (cz < 4) {
-                        int nx = tx + DX[cz], ny = ty + DY[cz];
-                        if (nx<0||nx>=H||ny<0||ny>=W ||
-                            bd->grid[nx][ny].zones[OPP[cz]] != type) {
-                            closed = false;
-                        } else {
-                            int nidx = (nx*W + ny)*5 + OPP[cz];
-                            if (!vis_zone[nidx]) {
-                                vis_zone[nidx] = true;
-                                q[qt++] = nidx;
-                            }
-                        }
+            int idx_center = (x * W + y) * 5 + CENTER;
+            if (!scored[idx_center] && bd->grid[x][y].zones[CENTER] == ABBEY) {
+                // compter les tuiles adjacentes (3×3 autour)
+                int adj_tiles = 0;
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dy = -1; dy <= 1; dy++) {
+                        int xx = x + dx, yy = y + dy;
+                        if (xx >= 0 && xx < H && yy >= 0 && yy < W && has_tile(bd, xx, yy))
+                            adj_tiles++;
                     }
                 }
-                // si incomplète → score
-                if (!closed) {
-                    // détermine meilleur joueur
-                    int best = 0;
-                    for (int pi=1; pi<game->players.num_players; pi++)
-                        if (mcount[pi] > mcount[best]) best = pi;
-                    if (mcount[best] > 0) {
-                        int pts = tile_count;                // 1 pt/tile
-                        if (type == CITY) pts += shield_count*2; // +2 pts/bouclier
-                        game->players.players[best].score += pts;
+                int pts = 1 + adj_tiles;
+                printf("[DEBUG] abbaye incomplète en (%d,%d) : adj_tiles=%d → pts=%d\n",
+                       x, y, adj_tiles, pts);
+
+                // attribuer si meeple
+                tile_t* abb = &bd->grid[x][y];
+                if (abb->has_meeple && abb->meeple_position == CENTER) {
+                    for (int p = 0; p < gp->num_players; p++) {
+                        if (gp->players[p].meeple_color == abb->meeple_color) {
+                            gp->players[p].score += pts;
+                            printf("Joueur %s marque %d pts (abbaye incomplète)\n",
+                                   gp->players[p].name, pts);
+                            break;
+                        }
                     }
-                    // retire meeples
-                    for (int xi=0; xi<H; xi++)
-                        for (int yi=0; yi<W; yi++)
-                            if (bd->grid[xi][yi].has_meeple)
-                                remove_meeple(bd, &game->players, (position_t){xi,yi});
+                    remove_meeple(bd, gp, (position_t){x, y});
                 }
-                free(q);
-                free(mcount);
+                scored[idx_center] = true;
             }
         }
     }
 
-    // 2) Abbayes incomplètes
-    for (int x = 0; x < H; x++) {
-        for (int y = 0; y < W; y++) {
-            tile_t *t = &bd->grid[x][y];
-            if (t->zones[CENTER] != ABBEY || !t->has_meeple) continue;
-            // compte cases manquantes autour
-            int missing = 0;
-            for (int dx=-1; dx<=1; dx++) {
-                for (int dy=-1; dy<=1; dy++) {
-                    if (dx==0 && dy==0) continue;
-                    int xx = x+dx, yy = y+dy;
-                    if (xx<0||xx>=H||yy<0||yy>=W ||
-                        !has_tile(bd,xx,yy)) missing++;
+    // --- Routes et villes incomplètes au niveau TUile ---
+    bool *vis_city = calloc(N, sizeof(bool));
+    bool *vis_road = calloc(N, sizeof(bool));
+
+    const int DX[4]  = {-1, 0, 1, 0};
+    const int DY[4]  = { 0, 1, 0,-1};
+    const int OPP[4] = { SOUTH, WEST, NORTH, EAST };
+
+    for (int kind = 0; kind < 2; kind++) {
+        bool *vis       = (kind == 0 ? vis_city : vis_road);
+        zone_type_t feat = (kind == 0 ? CITY : ROAD);
+        const char* name = (kind == 0 ? "ville" : "route");
+
+        for (int tid = 0; tid < N; tid++) {
+            int x = tid / W, y = tid % W;
+            tile_t* t = &bd->grid[x][y];
+
+            // vérifier si la tuile a la feature et pas déjà visitée
+            bool has_feat = false;
+            for (int d = 0; d < 4; d++) {
+                if (t->zones[d] == feat) { has_feat = true; break; }
+            }
+            if (!has_feat || vis[tid]) continue;
+
+            // BFS tile→tile
+            int *queue = malloc(N * sizeof(int));
+            int qh = 0, qt = 0;
+            queue[qt++] = tid;
+            vis[tid]    = true;
+
+            int tile_count = 0, shield_count = 0;
+            int *mcount   = calloc(gp->num_players, sizeof(int));
+
+            while (qh < qt) {
+                int cur = queue[qh++];
+                int cx  = cur / W, cy = cur % W;
+                tile_t *ct = &bd->grid[cx][cy];
+
+                tile_count++;
+                if (feat == CITY) {
+                    for (int d2 = 0; d2 < 5; d2++)
+                        if (ct->zones[d2] == SHIELD) shield_count++;
+                }
+                if (ct->has_meeple) {
+                    for (int p = 0; p < gp->num_players; p++) {
+                        if (gp->players[p].meeple_color == ct->meeple_color)
+                            mcount[p]++;
+                    }
+                }
+
+                for (int d = 0; d < 4; d++) {
+                    int nx = cx + DX[d], ny = cy + DY[d];
+                    if (nx < 0 || nx >= H || ny < 0 || ny >= W) continue;
+                    tile_t *nt = &bd->grid[nx][ny];
+                    if (nt->zones[OPP[d]] != feat) continue;
+                    int ntid = nx * W + ny;
+                    if (!vis[ntid]) {
+                        vis[ntid] = true;
+                        queue[qt++] = ntid;
+                    }
                 }
             }
-            // attribut au joueur
-            for (int pi=0; pi<game->players.num_players; pi++){
-                if (game->players.players[pi].meeple_color == t->meeple_color) {
-                    game->players.players[pi].score += missing;
-                    break;
+
+            free(queue);
+
+            // debug & calcul points
+            int pts = (feat == ROAD ? tile_count : tile_count + shield_count);
+            printf("[DEBUG] %s incomplète : tcount=%d, scount=%d → pts=%d\n",
+                   name, tile_count, shield_count, pts);
+
+            // déterminer majorité
+            int best = 0;
+            for (int p = 0; p < gp->num_players; p++)
+                if (mcount[p] > best) best = mcount[p];
+
+            if (best > 0) {
+                for (int p = 0; p < gp->num_players; p++) {
+                    if (mcount[p] == best) {
+                        gp->players[p].score += pts;
+                        printf("Joueur %s marque %d pts (%s incomplète)\n",
+                               gp->players[p].name, pts, name);
+                    }
+                }
+                // retirer tous les meeples de cette structure
+                for (int i = 0; i < N; i++) {
+                    if (vis[i]) {
+                        int ux = i / W, uy = i % W;
+                        if (bd->grid[ux][uy].has_meeple)
+                            remove_meeple(bd, gp, (position_t){ux, uy});
+                    }
                 }
             }
-            remove_meeple(bd, &game->players, (position_t){x,y});
+
+            free(mcount);
         }
     }
 
-    // libération
-    free(vis_zone);
-    free(vis_tile);
+    free(vis_city);
+    free(vis_road);
 }
