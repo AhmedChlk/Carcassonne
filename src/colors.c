@@ -23,7 +23,7 @@ const char* zone_color(zone_type_t z) {
         case SHIELD:  return "\033[0;35m";
         case VILLAGE: return "\033[0;36m";
         case ABBEY:   return "\033[0;37m";
-        default:      return ZC_RESET;
+        default:      return ANSI_RESET;
     }
 }
 

@@ -1,0 +1,10 @@
+route,ville,route,pre,route
+route,ville,pre,route,route
+blason,blason,blason,route,blason
+route,ville,pre,route,route
+route,ville,ville,route,route
+blason,pre,blason,blason,blason
+blason,pre,pre,blason,blason
+pre,route,route,route,village
+route,route,pre,pre,route
+route,route,pre,pre,route
