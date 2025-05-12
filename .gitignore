@@ -1,5 +1,4 @@
 *.o
 *.out
-src/main.c
 bin/
 build/
