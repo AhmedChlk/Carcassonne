@@ -8,7 +8,8 @@
 
 
 int main(void) {
-    game_t game = init_game(10,10,"data/tiles.csv");
+    game_t game = init_game(11,11,"data/test.csv");
     game_loop(&game);
+    free_game(&game);
     return 0;
 }

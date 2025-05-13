@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
 #include "board.h"
 #include "tile.h"
 #include "engine.h"
@@ -392,6 +393,7 @@ void get_placement_tile(board_t* board,frontiers_t* frontiere,tile_t tile,degree
 }
 
 game_t init_game(int H, int W, const char* fn) {
+    srand(time(NULL));
     game_t G;
     G.board           = create_board(H, W);
     G.frontier        = create_frontier();
@@ -405,8 +407,19 @@ game_t init_game(int H, int W, const char* fn) {
     return G;
 }
 
+void free_game(game_t* game) {
+    if (!game) return;
+
+    free_frontier(&game->frontier);
+    reset_valid_positions(game->valid_positions);
+    destroy_valid_positions(&game->valid_positions);
+    destroy_board(game->board);
+    free(game->players.players);
+}
+
+
 // Deux types sont considérés équivalents pour l'occupation d'une structure
-bool feature_matches(zone_type_t a, zone_type_t b) {
+static bool feature_matches(zone_type_t a, zone_type_t b) {
     return a == b || (a == CITY && b == SHIELD) || (a == SHIELD && b == CITY);
 }
 
@@ -519,7 +532,6 @@ void place_tile(board_t* bd, frontiers_t* f, tile_t t, position_t p) {
     }
 }
 
-
 static bool has_tile(board_t* bd, int x, int y) {
     for (int d = 0; d < 5; d++) {
         if (bd->grid[x][y].zones[d] != NONE) return true;
@@ -529,7 +541,9 @@ static bool has_tile(board_t* bd, int x, int y) {
 
 static int get_major_player(int* mcount, int nb_players) {
     int max = 0;
-    for (int i = 0; i < nb_players; i++) if (mcount[i] > max) max = mcount[i];
+    for (int i = 0; i < nb_players; i++) {
+        if (mcount[i] > max) max = mcount[i];
+    }
     return max;
 }
 
@@ -540,12 +554,11 @@ static void remove_visited_meeples(board_t* bd, game_players_t* gp, bool* zvis, 
         int dir = i % 5;
         int x = tid / W, y = tid % W;
         tile_t* t = &bd->grid[x][y];
-        if (t->has_meeple && t->meeple_position == dir) {
+        if (t->has_meeple && (int)t->meeple_position == dir) {
             remove_meeple(bd, gp, (position_t){x, y});
         }
     }
 }
-
 static void score_structure_by_zones(game_t* game, zone_type_t target, bool complete_mode) {
     board_t* bd = game->board;
     game_players_t* gp = &game->players;
@@ -556,6 +569,7 @@ static void score_structure_by_zones(game_t* game, zone_type_t target, bool comp
     static const int OPP4[4] = {SOUTH, WEST, NORTH, EAST};
 
     bool* zvis = calloc(total_z, sizeof(bool));
+    bool* tvis = calloc(H * W, sizeof(bool));  // ← pour éviter de compter une tuile plusieurs fois
 
     for (int idx = 0; idx < total_z; idx++) {
         if (zvis[idx]) continue;
@@ -564,10 +578,9 @@ static void score_structure_by_zones(game_t* game, zone_type_t target, bool comp
         int x = tile_id / W, y = tile_id % W;
 
         tile_t* t = &bd->grid[x][y];
-        if (t->zones[z] != target) continue;
+        if (!feature_matches(t->zones[z], target)) continue;
 
         int* q = malloc(total_z * sizeof(int));
-        bool* tvis = calloc(H * W, sizeof(bool));
         int* mcount = calloc(gp->num_players, sizeof(int));
         int qh = 0, qt = 0, tcount = 0, scount = 0;
         bool closed = true;
@@ -584,12 +597,20 @@ static void score_structure_by_zones(game_t* game, zone_type_t target, bool comp
             if (!tvis[tid]) {
                 tvis[tid] = true;
                 tcount++;
+
                 if (target == CITY) {
-                    for (int d = 0; d < 5; d++) if (ct->zones[d] == SHIELD) scount++;
+                    // Ne compter qu’un seul blason par tuile
+                    bool shield_found = false;
+                    for (int d = 0; d < 5 && !shield_found; d++) {
+                        if (feature_matches(ct->zones[d], SHIELD)) {
+                            scount++;
+                            shield_found = true;
+                        }
+                    }
                 }
             }
 
-            if (ct->has_meeple && ct->meeple_position == dir) {
+            if (ct->has_meeple && (int)ct->meeple_position == dir) {
                 for (int p = 0; p < gp->num_players; p++) {
                     if (gp->players[p].meeple_color == ct->meeple_color)
                         mcount[p]++;
@@ -600,10 +621,9 @@ static void score_structure_by_zones(game_t* game, zone_type_t target, bool comp
             for (int d = 0; d < 5; d++) {
                 int nid = tid * 5 + d;
                 if (zvis[nid]) continue;
-                if (ct->zones[d] != target) continue;
+                if (!feature_matches(ct->zones[d], target)) continue;
 
-                // Connexions logiques internes via le center
-                if (d == CENTER || dir == CENTER || ct->zones[CENTER] == target) {
+                if (d == CENTER || dir == CENTER || feature_matches(ct->zones[CENTER], target)) {
                     zvis[nid] = true;
                     q[qt++] = nid;
                 }
@@ -613,7 +633,7 @@ static void score_structure_by_zones(game_t* game, zone_type_t target, bool comp
             if (dir < 4) {
                 int nx = cx + DX4[dir], ny = cy + DY4[dir];
                 if (nx < 0 || nx >= H || ny < 0 || ny >= W ||
-                    bd->grid[nx][ny].zones[OPP4[dir]] != target) {
+                    !feature_matches(bd->grid[nx][ny].zones[OPP4[dir]], target)) {
                     closed = false;
                 } else {
                     int nidx = (nx * W + ny) * 5 + OPP4[dir];
@@ -627,7 +647,9 @@ static void score_structure_by_zones(game_t* game, zone_type_t target, bool comp
 
         int best = get_major_player(mcount, gp->num_players);
         if (best > 0 && (!complete_mode || closed)) {
-            int pts = (target == ROAD) ? tcount : (complete_mode ? tcount * 2 + scount * 2 : tcount + scount);
+            int pts = (target == ROAD)
+                      ? tcount
+                      : (complete_mode ? tcount * 2 + scount * 2 : tcount + scount);
             const char* label = (target == ROAD ? "route" : "ville");
 
             for (int p = 0; p < gp->num_players; p++) {
@@ -642,14 +664,12 @@ static void score_structure_by_zones(game_t* game, zone_type_t target, bool comp
         }
 
         free(q);
-        free(tvis);
         free(mcount);
     }
 
     free(zvis);
+    free(tvis);
 }
-
-
 static void score_abbayes(game_t* game, bool complete_mode) {
     board_t* bd = game->board;
     game_players_t* gp = &game->players;
@@ -692,8 +712,6 @@ static void score_abbayes(game_t* game, bool complete_mode) {
         }
     }
 }
-
-// === STRUCTURES PRINCIPALES ===
 
 void score_completed_structures(game_t* game, position_t last_pos) {
     board_t* bd = game->board;

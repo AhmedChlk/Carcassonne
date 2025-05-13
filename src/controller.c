@@ -20,7 +20,6 @@ void next_player(int *current, int total) {
     *current = (*current + 1) % total;
 }
 
-
 char get_input_key() {
     char buf[4] = {0};
     int n = 0, ch;
@@ -73,21 +72,28 @@ bool handle_tile_pick(game_t *game, bool *tileInHand, tile_t *tile) {
     if (game->tile_pack.remaining_tiles <= 0) return false;
     *tile = pick_tile(&game->tile_pack);
     *tileInHand = true;
+
+    printf("Tuile piochée : ");
+    gui_show_current_tile(*tile, ZERO);
+    sleep(1);
+
     return true;
 }
 
 bool handle_tile_placement(game_t *game, position_t cursor, tile_t tile, degree_t rot) {
+    for (int r = 0; r < (int)rot; ++r)
+        rotate_tile(&tile, NINETY);
+
     for (int i = 0; i < game->valid_positions->size; ++i) {
         position_t vp = game->valid_positions->positions[i];
         if (vp.x == cursor.x && vp.y == cursor.y) {
-            for (int r = 0; r < (int)rot; ++r)
-                rotate_tile(&tile, NINETY);
             place_tile(game->board, game->frontier, tile, cursor);
             return true;
         }
     }
     return false;
 }
+
 void handle_meeple_phase(game_t *game, position_t tile_pos, bool *tileInHand, bool *awaitingMeeple,
                          meeple_options_t opts, player_t *p) {
     while (1) {
@@ -113,7 +119,13 @@ void handle_meeple_phase(game_t *game, position_t tile_pos, bool *tileInHand, bo
             place_meeple(game->board, &game->players, dir, tile_pos, p->meeple_color);
             break;
         } else {
-            printf("Option invalide.\n");
+            printf("Option invalide. Choix valides : ");
+            if (opts.available[NORTH]) printf("N ");
+            if (opts.available[SOUTH]) printf("S ");
+            if (opts.available[EAST])  printf("E ");
+            if (opts.available[WEST])  printf("W ");
+            if (opts.available[CENTER])printf("C ");
+            printf("\n");
             sleep(2);
         }
     }
@@ -122,10 +134,11 @@ void handle_meeple_phase(game_t *game, position_t tile_pos, bool *tileInHand, bo
     *tileInHand = false;
     score_completed_structures(game, tile_pos);
 }
-
 void game_loop(game_t *game) {
     bool game_over = false;
     int current = 0;
+
+    // Position initiale de la vue centrée
     int centerX = game->board->height / 2;
     int centerY = game->board->width / 2;
     int viewX = centerY - VIEW_WIDTH / 2;
@@ -141,63 +154,74 @@ void game_loop(game_t *game) {
     position_t lastTilePos;
 
     while (!game_over) {
-        system("clear");
+        // 🔚 Fin de partie automatique
+        if (game->tile_pack.remaining_tiles <= 0 && !tileInHand && !awaitingMeeple) {
+            printf(ANSI_GREEN "\n🎉 Fin de la partie ! Calcul des scores finaux...\n" ANSI_RESET);
+            sleep(2);
+            score_incomplete_structures(game);
+            game_over = true;
+            break;
+        }
+
         player_t *p = &game->players.players[current];
 
-        display_turn_header(p->name, p->meeple_color, tileInHand, handRot);
-        display_scores(game);
-        printf("Tuiles restantes : %d\n\n", game->tile_pack.remaining_tiles);
-
+        // 🎯 Calcul des positions valides si une tuile est en main
         if (tileInHand && !awaitingMeeple) {
-            bool found = false;
-            for (int r = 0; r < 4; ++r) {
-                get_placement_tile(game->board, game->frontier, handOrigTile, r, game->valid_positions);
-                if (game->valid_positions->size > 0) {
-                    handRot = r;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                printf("Aucune position valide pour cette tuile. Nouvelle pioche...\n");
-                sleep(2);
-                tileInHand = false;
-                continue;
-            }
             get_placement_tile(game->board, game->frontier, handOrigTile, handRot, game->valid_positions);
             gui_set_valid_positions(game->valid_positions);
         } else {
             gui_set_valid_positions(NULL);
         }
 
+        // 🖥️ Affichage interface
+        system("clear");
+        display_turn_header(p->name, p->meeple_color, tileInHand, handRot);
+        display_scores(game);
+        printf("Tuiles restantes : %d\n\n", game->tile_pack.remaining_tiles);
         print_board(game->board, viewX, viewY, VIEW_WIDTH, VIEW_HEIGHT, cursor);
         if (tileInHand) gui_show_current_tile(handOrigTile, handRot);
-        if (!tileInHand) printf("\nZQSD=\u00b11 | \u2191\u2193\u2190\u2192=\u00b110 | Entr\u00e9e=pioche\n");
-        else if (!awaitingMeeple) printf("\nZQSD=\u00b11 | \u2191\u2193\u2190\u2192=\u00b110 | R=rotate | Entr\u00e9e=place\n");
-        else printf("\nM=choix meeple | N=skip meeple\n");
 
+        // ℹ️ Instructions interface
+        if (!tileInHand)
+            printf("\nZQSD=±1 | ↑↓←→=±10 | Entrée=pioche\n");
+        else if (!awaitingMeeple)
+            printf("\nZQSD=±1 | ↑↓←→=±10 | R=rotate | Entrée=place\n");
+        else
+            printf("\nM=choix meeple | N=skip meeple\n");
+
+        // ⌨️ Lecture entrée clavier
         char input = get_input_key();
+
+        // 🎮 Déplacement curseur
         if (!awaitingMeeple && handle_cursor_movement(input, &cursor, &viewX, &viewY, game)) continue;
 
+        // 🂠 Pioche d'une tuile
         if (!tileInHand && input == '\n') {
-            if (handle_tile_pick(game, &tileInHand, &handOrigTile)) continue;
+            if (handle_tile_pick(game, &tileInHand, &handOrigTile)) {
+                handRot = ZERO;
+                get_placement_tile(game->board, game->frontier, handOrigTile, handRot, game->valid_positions);
+            }
             continue;
         }
 
+        // ⬇️ Placement de la tuile
         if (tileInHand && !awaitingMeeple) {
             if (input == 'r') {
                 handRot = (degree_t)((handRot + 1) % 4);
                 get_placement_tile(game->board, game->frontier, handOrigTile, handRot, game->valid_positions);
                 continue;
             }
+
             if (input == '\n') {
                 if (!handle_tile_placement(game, cursor, handOrigTile, handRot)) {
                     printf("Position invalide.\n");
                     sleep(2);
                     continue;
                 }
-                currentOpts = get_placement_meeple(game->board, cursor);
+
                 lastTilePos = cursor;
+                currentOpts = get_placement_meeple(game->board, lastTilePos);
+
                 if (p->meeples == 0 || !has_any_option(currentOpts)) {
                     printf("Aucun meeple dispo ou aucune position valide. Passage...\n");
                     sleep(2);
@@ -206,11 +230,13 @@ void game_loop(game_t *game) {
                     next_player(&current, game->players.num_players);
                     continue;
                 }
+
                 awaitingMeeple = true;
                 continue;
             }
         }
 
+        // 👤 Choix placement de meeple
         if (awaitingMeeple) {
             if (input == 'm') {
                 handle_meeple_phase(game, lastTilePos, &tileInHand, &awaitingMeeple, currentOpts, p);
@@ -225,12 +251,8 @@ void game_loop(game_t *game) {
                 continue;
             }
         }
-
-        if (game->tile_pack.remaining_tiles <= 0 && !tileInHand && !awaitingMeeple) {
-            score_incomplete_structures(game);
-            game_over = true;
-        }
     }
 
+    // 🏁 Fin affichage vainqueur
     display_winner(game->players);
 }
