@@ -6,6 +6,7 @@
 #include "controller.h"
 #include "gui.h"
 
+
 int main(void) {
     game_t game = init_game(10,10,"data/tiles.csv");
     game_loop(&game);

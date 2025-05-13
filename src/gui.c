@@ -291,3 +291,25 @@ void display_scores(game_t *game) {
     }
     printf("\n\n");
 }
+
+void display_winner(game_players_t players) {
+    printf("\n" CYAN_BOLD "╭──────────── Fin de la partie ────────────╮" ANSI_RESET "\n");
+
+    int max = 0;
+    for (int i = 0; i < players.num_players; ++i)
+        if (players.players[i].score > max)
+            max = players.players[i].score;
+
+    for (int i = 0; i < players.num_players; ++i) {
+        player_t *p = &players.players[i];
+        const char *color = color_code(p->meeple_color);
+        if (p->score == max) {
+            printf(YELLOW_BOLD "🏆 %s%s" ANSI_RESET WHITE_BOLD " a gagné avec %d points !" ANSI_RESET "\n",
+                   color, p->name, max);
+        } else {
+            printf("  %s%s" ANSI_RESET " : %d points\n", color, p->name, p->score);
+        }
+    }
+
+    printf(CYAN_BOLD "╰───────────────────────────────────────────╯" ANSI_RESET "\n");
+}
