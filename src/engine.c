@@ -410,7 +410,6 @@ bool feature_matches(zone_type_t a, zone_type_t b) {
     return a == b || (a == CITY && b == SHIELD) || (a == SHIELD && b == CITY);
 }
 
-// DFS : détecte si un meeple est déjà présent dans la même structure connectée
 bool dfs_has_meeple(board_t* board, int x, int y, direction_t dir, zone_type_t target, bool* visited) {
     int idx = (x * board->width + y) * 5 + dir;
     if (visited[idx]) return false;
@@ -418,10 +417,41 @@ bool dfs_has_meeple(board_t* board, int x, int y, direction_t dir, zone_type_t t
 
     tile_t* tile = &board->grid[x][y];
 
+    // Meeple directement sur la zone actuelle
     if (tile->has_meeple && tile->meeple_position == dir)
         return true;
 
-    // Exploration interne (centre connecté aux bords)
+    // Cas indirect : le center est du même type ET contient un meeple
+    if (dir != CENTER && tile->has_meeple &&
+        tile->meeple_position == CENTER &&
+        feature_matches(tile->zones[dir], tile->zones[CENTER]) &&
+        feature_matches(tile->zones[CENTER], target)) {
+        return true;
+    }
+
+    // Cas inverse : depuis le CENTER, un bord connecté contient un meeple
+    if (dir == CENTER) {
+        for (direction_t d = 0; d < CENTER; d++) {
+            if (tile->has_meeple && tile->meeple_position == d &&
+                feature_matches(tile->zones[CENTER], tile->zones[d]) &&
+                feature_matches(tile->zones[d], target)) {
+                return true;
+            }
+        }
+    }
+
+    // Nouvelle exploration interne via center : si center relie à d'autres directions
+    if (dir != CENTER && feature_matches(tile->zones[dir], tile->zones[CENTER]) &&
+        feature_matches(tile->zones[CENTER], target)) {
+        for (direction_t d = 0; d < CENTER; d++) {
+            if (d != dir && feature_matches(tile->zones[d], target)) {
+                if (dfs_has_meeple(board, x, y, d, target, visited))
+                    return true;
+            }
+        }
+    }
+
+    // Exploration standard depuis le center vers bords
     if (dir == CENTER || feature_matches(tile->zones[CENTER], target)) {
         for (direction_t d = 0; d < CENTER; d++) {
             if (d != dir && feature_matches(tile->zones[d], target)) {
@@ -431,14 +461,13 @@ bool dfs_has_meeple(board_t* board, int x, int y, direction_t dir, zone_type_t t
         }
     }
 
-    // Exploration vers la tuile voisine (si ce n’est pas le centre)
+    // Exploration vers tuiles voisines
     if (dir < CENTER) {
-        static const int DX[4] = {-1, 0, 1, 0};
-        static const int DY[4] = { 0, 1, 0, -1};
-        static const direction_t OPP[4] = {SOUTH, WEST, NORTH, EAST};
+        const int DX[4] = {-1, 0, 1, 0};
+        const int DY[4] = { 0, 1, 0, -1};
+        const direction_t OPP[4] = {SOUTH, WEST, NORTH, EAST};
 
         int nx = x + DX[dir], ny = y + DY[dir];
-
         if (nx >= 0 && nx < board->height && ny >= 0 && ny < board->width) {
             tile_t* neighbor = &board->grid[nx][ny];
             if (feature_matches(neighbor->zones[OPP[dir]], target)) {
@@ -450,6 +479,7 @@ bool dfs_has_meeple(board_t* board, int x, int y, direction_t dir, zone_type_t t
 
     return false;
 }
+
 
 // Détermine les zones où un meeple peut être placé sur une tuile à la position donnée
 meeple_options_t get_placement_meeple(board_t* board, position_t pos) {
