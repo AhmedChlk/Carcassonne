@@ -48,7 +48,7 @@ game_players_t create_players(void);
 
 /* =========== FRONTIÈRES DU PLATEAU =========== */
 
-frontiers_t* allocate_frontier(void);
+frontiers_t* create_frontier(void);
 void free_frontier(frontiers_t** frontier);
 bool is_in_frontier(frontiers_t* frontier, position_t pos);
 void add_to_frontier(frontiers_t* frontier, position_t pos);
@@ -62,6 +62,9 @@ void place_meeple(board_t* board, game_players_t* p, direction_t d, position_t p
 void remove_meeple(board_t* bd, game_players_t* gp, position_t p);
 
 /* Retourne les directions valides où placer un meeple sur la tuile */
+
+/* DFS pour vérifier si une structure contient un meeple */
+bool dfs_has_meeple(board_t* board, int x, int y, direction_t zone, zone_type_t target, bool *visited);
 meeple_options_t get_placement_meeple(board_t* board, position_t pos);
 
 /* =========== POSITIONS VALIDES =========== */
@@ -88,10 +91,5 @@ void score_completed_structures(game_t* G, position_t last_pos);
 /* Marque les structures incomplètes en fin de partie */
 void score_incomplete_structures(game_t* game);
 
-/* BFS pour explorer une structure et retourner son score */
-structure_score_t bfs_structure(board_t* board, game_players_t* players, int start_x, int start_y, zone_type_t target_feature, bool* visited);
-
-/* DFS pour vérifier si une structure contient un meeple */
-bool dfs_has_meeple(board_t* board, int x, int y, direction_t zone, zone_type_t target, bool *visited);
 
 #endif // ENGINE_H
