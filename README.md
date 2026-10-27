@@ -20,3 +20,6 @@ Ce projet consiste à développer une version numérique du célèbre jeu de pla
 ```bash
 make run
 ```
+
+## Licence
+Ce projet est distribué sous licence MIT. Voir le fichier [LICENSE](LICENSE).
